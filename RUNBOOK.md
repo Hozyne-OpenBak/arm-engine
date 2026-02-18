@@ -1995,6 +1995,387 @@ See logs above for detailed output (detected updates + planned actions).
 
 ---
 
+
+---
+
+## Documentation Screenshots Guide
+
+**Purpose:** Capture visual evidence of workflow execution for troubleshooting, training, and documentation.
+
+**Story:** #36  
+**Task:** T36.5  
+**Epic:** #30
+
+---
+
+### Why Screenshots Matter
+
+Screenshots provide:
+- **Visual confirmation** of workflow status and results
+- **Training materials** for new team members
+- **Troubleshooting evidence** when debugging issues
+- **Audit trail** for compliance and process documentation
+
+---
+
+### What to Capture
+
+#### 1. Workflow Run List
+
+**Location:** `https://github.com/Hozyne-OpenBak/arm-engine/actions`
+
+**Shows:**
+- Recent workflow runs
+- Run status (✅ success, ❌ failure, 🟡 in progress)
+- Trigger source (manual vs automated)
+- Run duration
+
+**When to capture:**
+- After triggering workflow
+- For status reporting
+- During troubleshooting
+
+---
+
+#### 2. Workflow Run Details
+
+**Location:** Click on a workflow run → "execute" job
+
+**Shows:**
+- Individual step status
+- Step durations
+- Expanded log output
+- Annotations (notices, warnings, errors)
+
+**When to capture:**
+- Successful runs (for documentation)
+- Failed runs (for debugging)
+- Unusual behavior (for investigation)
+
+---
+
+#### 3. Workflow Run Summary
+
+**Location:** Bottom of workflow run page
+
+**Shows:**
+- Job summary markdown table
+- Story URLs created
+- PR URLs created
+- Success/failure counts
+
+**When to capture:**
+- After every production run
+- For reporting to stakeholders
+- For audit logs
+
+---
+
+#### 4. Workflow Inputs
+
+**Location:** "Run workflow" dropdown → Input fields
+
+**Shows:**
+- Available input fields
+- Default values
+- Dropdown options (e.g., dryRun)
+
+**When to capture:**
+- When documenting trigger process
+- For training materials
+
+---
+
+#### 5. Annotations Panel
+
+**Location:** Workflow run → "Annotations" tab (top bar)
+
+**Shows:**
+- Notice annotations (✅ successes)
+- Warning annotations (⚠️ skips, retries)
+- Error annotations (❌ failures)
+
+**When to capture:**
+- Failed runs with error annotations
+- Runs with warnings (rate limits, retries)
+- For troubleshooting guides
+
+---
+
+#### 6. Created Story/PR
+
+**Location:** Links from workflow logs or summary
+
+**Shows:**
+- Story issue details
+- PR details and file changes
+- Cross-repo references
+
+**When to capture:**
+- Successful production runs
+- For documentation of results
+- For training on expected output
+
+---
+
+### How to Capture Screenshots
+
+#### Browser (Recommended)
+
+**Full page:**
+1. Open workflow run page
+2. Right-click → "Inspect" (open DevTools)
+3. Cmd/Ctrl + Shift + P → "Capture full size screenshot"
+4. Saves PNG to Downloads folder
+
+**Visible area:**
+1. Open workflow run page
+2. Cmd/Ctrl + Shift + 4 (macOS) or Snipping Tool (Windows)
+3. Select region to capture
+4. Save to desired location
+
+---
+
+#### GitHub CLI (Metadata Only)
+
+```bash
+# Capture workflow run metadata
+gh run view <run-id> --repo Hozyne-OpenBak/arm-engine --json \
+  number,status,conclusion,createdAt,updatedAt,url \
+  > run-<run-id>-metadata.json
+
+# Capture workflow logs (text)
+gh run view <run-id> --repo Hozyne-OpenBak/arm-engine --log \
+  > run-<run-id>-logs.txt
+```
+
+---
+
+### Naming Convention
+
+Use descriptive filenames for easy organization:
+
+**Format:** `arm-<component>-<status>-<timestamp>.png`
+
+**Examples:**
+```
+arm-workflow-run-success-2026-02-18.png
+arm-job-summary-production-2026-02-18.png
+arm-annotations-rate-limit-warning-2026-02-18.png
+arm-trigger-inputs-dry-run-2026-02-18.png
+arm-logs-story-created-2026-02-18.png
+```
+
+**Storage:**
+- Local: `docs/screenshots/` directory (not committed to git)
+- Shared: Internal wiki, Confluence, or documentation system
+- Issue threads: Attach to relevant GitHub issues
+
+---
+
+### Screenshot Checklist
+
+Use this checklist when documenting a new feature or troubleshooting:
+
+#### Dry-Run Mode
+- [ ] Workflow run list showing "ARM Execute" with success status
+- [ ] Workflow inputs with `dryRun=true`
+- [ ] Logs showing "DRY RUN MODE" indicator
+- [ ] Job summary with "Dry Run" label
+
+#### Production Mode
+- [ ] Workflow run list showing production run
+- [ ] Logs showing "Story created:" URLs
+- [ ] Logs showing "PR created:" URLs
+- [ ] Job summary table with Story/PR links
+- [ ] Annotations panel with success notices
+- [ ] Created Story issue (with ARM label)
+- [ ] Created PR (with cross-repo reference)
+
+#### Failure Scenarios
+- [ ] Failed workflow run in run list (red ❌)
+- [ ] Error logs with failure reason
+- [ ] Error annotations panel
+- [ ] Troubleshooting steps taken
+
+---
+
+### Annotating Screenshots
+
+When sharing screenshots for troubleshooting or documentation:
+
+1. **Highlight key areas:**
+   - Use red box for errors
+   - Use green box for successes
+   - Use yellow for warnings
+
+2. **Add arrows/labels:**
+   - Point to specific log lines
+   - Label input fields
+   - Indicate sequence (1, 2, 3)
+
+3. **Redact sensitive data:**
+   - ⚠️ **Never share** full GitHub tokens
+   - ⚠️ **Blur** email addresses if public
+   - ⚠️ **Hide** internal repository names (if applicable)
+
+4. **Add context:**
+   - Include timestamp in annotation
+   - Add caption describing what's shown
+   - Link to related GitHub issue
+
+**Tools for annotation:**
+- macOS: Preview.app (Tools → Annotate)
+- Windows: Paint / Snip & Sketch
+- Cross-platform: GIMP, Inkscape, or online tools
+
+---
+
+### Best Practices
+
+#### DO:
+- ✅ Capture screenshots immediately after significant events
+- ✅ Use consistent naming conventions
+- ✅ Store screenshots in organized folders (by date or feature)
+- ✅ Include timestamps and context
+- ✅ Annotate when sharing with others
+
+#### DON'T:
+- ❌ Commit large binary screenshots to git (use docs system instead)
+- ❌ Share screenshots with exposed secrets or tokens
+- ❌ Capture partial views that lack context
+- ❌ Use vague filenames like "screenshot1.png"
+
+---
+
+### Integration with Documentation
+
+#### RUNBOOK Updates
+
+When adding new features to RUNBOOK.md:
+
+1. Capture screenshots of new workflow steps
+2. Reference screenshots in text:
+   ```markdown
+   **Example:** See `docs/screenshots/arm-new-feature-2026-02-18.png`
+   ```
+3. Store screenshots in internal docs system (not git)
+
+#### GitHub Issues
+
+When reporting bugs or requesting features:
+
+1. Attach relevant screenshots to issue
+2. Add caption describing what's shown
+3. Link to workflow run URL for full context
+
+#### Training Materials
+
+For onboarding new team members:
+
+1. Create step-by-step guide with screenshots
+2. Use numbered screenshots showing workflow
+3. Add annotations highlighting key UI elements
+
+---
+
+### Example Documentation Template
+
+```markdown
+## Feature: [Feature Name]
+
+### Overview
+[Brief description]
+
+### Visual Guide
+
+**Step 1: Trigger Workflow**
+![Workflow Trigger](arm-trigger-inputs-2026-02-18.png)
+*Screenshot shows workflow inputs with dryRun=true*
+
+**Step 2: Monitor Execution**
+![Workflow Running](arm-logs-running-2026-02-18.png)
+*Logs show scanning and filtering in progress*
+
+**Step 3: Review Results**
+![Job Summary](arm-summary-success-2026-02-18.png)
+*Job summary displays created Stories and PRs*
+
+### Key Indicators
+- ✅ "Scan complete" in logs
+- ✅ Story URLs logged
+- ✅ PR URLs logged
+- ✅ Job summary generated
+
+### Troubleshooting
+See [Troubleshooting Guide](#troubleshooting-github-actions-runs) if:
+- ❌ Workflow fails immediately
+- ⚠️ Rate limit warnings appear
+- ⚠️ No Stories or PRs created
+```
+
+---
+
+### Automated Screenshot Capture (Future)
+
+For CI/CD pipelines, consider:
+
+**Playwright (Browser Automation):**
+```javascript
+// Example: Capture workflow page
+const { chromium } = require('playwright');
+
+const browser = await chromium.launch();
+const page = await browser.newPage();
+await page.goto('https://github.com/Hozyne-OpenBak/arm-engine/actions');
+await page.screenshot({ 
+  path: 'arm-workflow-list.png', 
+  fullPage: true 
+});
+await browser.close();
+```
+
+**GitHub API + Rendering:**
+```bash
+# Capture workflow run data
+gh run view $RUN_ID --json status,conclusion,createdAt | \
+  jq -r '. | "Status: \(.status)\nConclusion: \(.conclusion)\nCreated: \(.createdAt)"' \
+  > run-summary.txt
+
+# Convert to image (requires ImageMagick)
+convert -size 800x600 -background white -fill black \
+  -pointsize 20 -gravity northwest \
+  label:"$(cat run-summary.txt)" \
+  run-summary.png
+```
+
+**Note:** Automated screenshot capture is optional and should supplement manual captures, not replace them.
+
+---
+
+### Summary
+
+Screenshots are essential for:
+- 📸 **Documenting** workflow execution
+- 🐛 **Debugging** failed runs
+- 📚 **Training** new team members
+- ✅ **Auditing** process compliance
+
+**Quick Checklist:**
+- [ ] Capture workflow run list
+- [ ] Capture job details and logs
+- [ ] Capture job summary
+- [ ] Capture created Story/PR (if applicable)
+- [ ] Use descriptive filenames
+- [ ] Annotate when sharing
+- [ ] Store in organized location
+- [ ] Never expose secrets
+
+For more details, see:
+- [GitHub Actions Execution](#github-actions-execution)
+- [Troubleshooting](#troubleshooting-github-actions-runs)
+- [Best Practices](#best-practices)
+
 ## Recovery Procedures
 
 ### Clean Up Failed Run
