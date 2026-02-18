@@ -17,6 +17,8 @@
 const fs = require('fs');
 const path = require('path');
 const { DependencyScanner, UpdateFilter, StoryCreator, PRGenerator } = require('./index');
+const { validateConfig, logConfigSummary } = require('./utils/config-validator');
+const { writeJobSummary } = require('./utils/summary-generator');
 const { logAnnotation } = require('./utils/logger');
 
 async function main() {
@@ -55,6 +57,15 @@ async function main() {
     config = JSON.parse(fs.readFileSync(configFullPath, 'utf8'));
   } catch (error) {
     console.error(`❌ Error loading config: ${error.message}`);
+    process.exit(1);
+  }
+  
+  // Validate configuration
+  try {
+    validateConfig(config);
+    logConfigSummary(config);
+  } catch (error) {
+    console.error(`❌ Config validation failed: ${error.message}`);
     process.exit(1);
   }
   
@@ -158,13 +169,26 @@ async function main() {
     let reusedCount = 0;
     let skippedCount = 0;
     let failedCount = 0;
+    const executionResults = [];
     
     for (const dep of results.recommended) {
       console.log(`\nProcessing: ${dep.package} (${dep.current} → ${dep.wanted})`);
       
+      const result = {
+        packageName: dep.package,
+        current: dep.current,
+        wanted: dep.wanted,
+        type: dep.type,
+        storyUrl: null,
+        prUrl: null,
+        status: '❌ Failed'
+      };
+      
       // Create Story (with duplicate detection)
       try {
         const { story, wasReused } = await storyCreator.createStoryIfNotExists(dep, report.ecosystem, false);
+        
+        result.storyUrl = { number: story.number, url: story.url };
         
         if (wasReused) {
           console.log(`♻️  Story reused: ${story.url}`);
@@ -182,27 +206,38 @@ async function main() {
           if (pr) {
             console.log(`✅ PR created: ${pr.url}`);
             logAnnotation('notice', `PR created for ${dep.package}: ${config.target.repository}#${pr.number}`);
+            result.prUrl = { number: pr.number, url: pr.url };
+            result.status = '✅ Created';
             createdCount++;
           } else {
             console.log(`⏭️  PR skipped: No changes needed (package may already be at target version)`);
             logAnnotation('warning', `PR skipped for ${dep.package}: No changes needed`);
+            result.status = '⏭️ Skipped';
             skippedCount++;
           }
         } catch (error) {
           console.error(`❌ PR creation failed: ${error.message}`);
           logAnnotation('error', `PR creation failed for ${dep.package}: ${error.message}`);
+          result.status = '❌ PR Failed';
           failedCount++;
         }
       } catch (error) {
         console.error(`❌ Story creation failed: ${error.message}`);
         logAnnotation('error', `Story creation failed for ${dep.package}: ${error.message}`);
+        result.status = '❌ Story Failed';
         failedCount++;
       }
+      
+      executionResults.push(result);
     }
     
     console.log('\n' + '─'.repeat(80));
     console.log(`Summary: ✅ Created: ${createdCount} | ♻️  Reused: ${reusedCount} | ⏭️  Skipped: ${skippedCount} | ❌ Failed: ${failedCount}`);
     console.log('─'.repeat(80));
+    
+    // Write GitHub Actions job summary
+    writeJobSummary(executionResults);
+    
     console.log('\n✨ ARM execution complete (production).\n');
   }
 }
