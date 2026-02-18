@@ -89,6 +89,253 @@ node -e "require('./arm.config.json'); console.log('✓ Valid JSON')"
 
 ---
 
+## Policy Configuration
+
+### Safe Defaults & Rationale
+
+ARM enforces safe update policies by default to prevent breaking changes and production incidents.
+
+#### allowMajor: false (Enforced)
+
+**Default:** `false` (cannot be changed)  
+**Enforced by:** Config validator at startup  
+**Rationale:**
+
+Major version updates (e.g., `express` 4.x → 5.x) frequently introduce breaking changes:
+- API removals or changes
+- Behavior modifications
+- Dependency upgrades
+- Migration requirements
+
+**ARM policy:** Major updates **always** require human review. This is a hard constraint enforced by config validation.
+
+**Attempting to enable major updates:**
+\`\`\`json
+{
+  "policy": {
+    "allowMajor": true  // ❌ FAILS VALIDATION
+  }
+}
+\`\`\`
+
+**Validation error:**
+\`\`\`
+❌ Config validation failed: allowMajor must be false (safe default enforced).
+   Major version updates require human review and are blocked automatically.
+\`\`\`
+
+**Workflow for major updates:**
+1. ARM detects major update available
+2. ARM logs: `⏭️ Excluded: package@X → Y (major update blocked)`
+3. No Story/PR created
+4. Human reviews major update manually
+5. Human creates Story/PR if appropriate
+
+### Denylist Configuration
+
+The `policy.denylist` field excludes specific packages from ARM processing.
+
+#### When to Use Denylist
+
+**1. Packages with breaking minor/patch updates**
+\`\`\`json
+{
+  "policy": {
+    "denylist": ["express", "socket.io"]
+  }
+}
+\`\`\`
+Some packages introduce breaking changes even in minor or patch releases. Exclude these until you can review manually.
+
+**2. Dependencies managed externally**
+\`\`\`json
+{
+  "policy": {
+    "denylist": ["react", "react-dom"]
+  }
+}
+\`\`\`
+If another team or process manages specific dependencies, exclude them to avoid conflicts.
+
+**3. Custom update workflows**
+\`\`\`json
+{
+  "policy": {
+    "denylist": ["webpack", "babel-core"]
+  }
+}
+\`\`\`
+Build tools or framework packages may require special testing or coordination. Exclude to handle separately.
+
+**4. Temporary exclusions during migrations**
+\`\`\`json
+{
+  "policy": {
+    "denylist": ["typescript", "@types/node"]
+  }
+}
+\`\`\`
+During large refactors or migrations, temporarily exclude packages to control timing.
+
+#### Denylist Behavior
+
+- **Exact matching:** `"express"` matches `express` only, not `express-session`
+- **Case-sensitive:** `"Express"` and `"express"` are different packages
+- **No wildcards:** Cannot use `"@types/*"` (use `excludePatterns` for globs)
+- **Logged:** All denylisted packages are logged during filtering
+- **No Story/PR:** Denylisted packages never create Stories or PRs
+
+#### Denylist vs. Exclusion Patterns
+
+| Feature | Denylist | Exclusion Patterns |
+|---------|----------|-------------------|
+| **Field** | `policy.denylist` | `policy.excludePatterns` |
+| **Matching** | Exact name | Glob patterns |
+| **Example** | `"lodash"` | `"@types/*"` |
+| **Status** | ✅ Recommended | ⚠️ Deprecated |
+
+**Recommendation:** Use `denylist` for exact package names. Use `excludePatterns` only for glob patterns.
+
+### Validation Failures & Fixes
+
+#### Missing Policy Section
+\`\`\`
+❌ Config validation failed: Config must include policy section
+\`\`\`
+
+**Fix:** Add policy object to config:
+\`\`\`json
+{
+  "policy": {
+    "allowMajor": false,
+    "denylist": []
+  }
+}
+\`\`\`
+
+#### Invalid Denylist Type
+\`\`\`
+❌ Config validation failed: policy.denylist must be an array of package names
+\`\`\`
+
+**Fix:** Change denylist to array:
+\`\`\`json
+{
+  "policy": {
+    "denylist": []  // Not: "express" (string)
+  }
+}
+\`\`\`
+
+#### Empty String in Denylist
+\`\`\`
+❌ Config validation failed: policy.denylist[0] cannot be an empty string
+\`\`\`
+
+**Fix:** Remove empty entries:
+\`\`\`json
+{
+  "policy": {
+    "denylist": ["express"]  // Not: ["express", ""]
+  }
+}
+\`\`\`
+
+#### Missing Required Fields
+\`\`\`
+❌ Config validation failed: governance.epicNumber is required and must be a number
+\`\`\`
+
+**Fix:** Add all required fields:
+\`\`\`json
+{
+  "target": { "repository": "owner/repo" },
+  "governance": {
+    "repository": "owner/governance",
+    "epicNumber": 30
+  },
+  "policy": {}
+}
+\`\`\`
+
+### Exclusion Logging
+
+ARM logs all exclusions to provide visibility into filtering decisions:
+
+\`\`\`
+🔍 Step 2: Applying filter policy...
+   Policy: patch=true, minor=true, major=false
+
+⏭️  Excluded: express (denylisted)
+⏭️  Excluded: webpack@4.46.0 → 5.76.0 (major update blocked)
+⏭️  Excluded: @types/node (matches exclusion pattern)
+
+Recommended updates: 5
+Excluded: 3
+\`\`\`
+
+**Log format:**
+- **Denylisted:** `⏭️ Excluded: <package> (denylisted)`
+- **Major blocked:** `⏭️ Excluded: <package>@<current> → <wanted> (major update blocked)`
+- **Pattern match:** `⏭️ Excluded: <package> (matches exclusion pattern)`
+
+**Visibility:**
+- Console output during execution
+- GitHub Actions job logs (when integrated)
+- Helps debug why packages weren't processed
+
+### Best Practices
+
+#### Start Conservative
+\`\`\`json
+{
+  "policy": {
+    "allowPatch": true,
+    "allowMinor": false,  // Start with patches only
+    "allowMajor": false,
+    "denylist": []
+  }
+}
+\`\`\`
+Enable minor updates after gaining confidence with patches.
+
+#### Review Logs Regularly
+Check exclusion logs to understand filtering:
+- Are major updates being blocked as expected?
+- Are denylisted packages being skipped?
+- Any unexpected exclusions?
+
+#### Keep Denylist Short
+Aim for <10 packages in denylist. Long denylists indicate:
+- Policy too aggressive (consider `allowMinor: false`)
+- Too many custom workflows (consolidate or automate)
+- Packages that should be upgraded manually
+
+#### Document Denylist Reasons
+Maintain comments in config or documentation:
+\`\`\`json
+{
+  "policy": {
+    "denylist": [
+      "express",     // Waiting for 5.x migration - Issue #123
+      "webpack"      // Build tool managed by ops team
+    ]
+  }
+}
+\`\`\`
+
+#### Test with Dry-Run
+Always test policy changes with `dryRun: true` first:
+\`\`\`bash
+# 1. Update policy in config
+# 2. Run dry-run
+node demo.js --full
+# 3. Review output
+# 4. If correct, set dryRun: false
+\`\`\`
+
+---
+
 ## Execution Modes
 
 ### 1. Dry-Run Mode (Recommended for Testing)
