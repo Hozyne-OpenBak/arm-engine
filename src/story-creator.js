@@ -163,13 +163,15 @@ ${dep.wanted !== dep.latest ? `**Note:** Latest version is ${dep.latest}, but ${
 
     if (dryRun) {
       // Dry-run mode: return mock Story
-      return {
+      const mockStory = {
         number: 0,
         title,
         url: `https://github.com/${this.governanceRepo}/issues/0 (dry-run)`,
         body,
         dependency: dep
       };
+      console.log(`[DRY-RUN] Would create Story: ${mockStory.url}`);
+      return mockStory;
     }
 
     // Create issue via gh CLI
@@ -199,12 +201,16 @@ ${dep.wanted !== dep.latest ? `**Note:** Latest version is ${dep.latest}, but ${
       const issueUrl = output;
       const issueNumber = parseInt(issueUrl.split('/').pop(), 10);
 
-      return {
+      const story = {
         number: issueNumber,
         title,
         url: issueUrl,
         dependency: dep
       };
+
+      console.log(`✅ Story created: ${issueUrl}`);
+
+      return story;
     } catch (error) {
       throw new Error(`Failed to create Story issue: ${error.message}`);
     }
