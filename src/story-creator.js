@@ -217,8 +217,10 @@ ${dep.wanted !== dep.latest ? `**Note:** Latest version is ${dep.latest}, but ${
    */
   async findExistingStory(dep) {
     try {
-      const searchQuery = `repo:${this.governanceRepo} is:issue label:story "${dep.package}" in:title`;
-      const command = `gh issue list --repo ${this.governanceRepo} --search "${searchQuery}" --json number,title,url --limit 10`;
+      // Search for open Stories matching package and target version
+      // Note: Not including "from ${dep.current}" since current can be "unknown"
+      const searchQuery = `repo:${this.governanceRepo} is:issue is:open "${dep.package}" "to ${dep.wanted}" in:title`;
+      const command = `gh issue list --repo ${this.governanceRepo} --search "${searchQuery}" --json number,title,url,body --limit 10`;
 
       const output = execSync(command, {
         encoding: 'utf8',
@@ -229,11 +231,14 @@ ${dep.wanted !== dep.latest ? `**Note:** Latest version is ${dep.latest}, but ${
 
       const issues = JSON.parse(output);
       
-      // Look for exact match
+      // Look for exact match on package + target version + target repo
       for (const issue of issues) {
-        if (issue.title.includes(`${dep.package}`) && 
-            issue.title.includes(`from ${dep.current}`) &&
-            issue.title.includes(`to ${dep.wanted}`)) {
+        const titleMatches = issue.title.includes(`${dep.package}`) && 
+                           issue.title.includes(`to ${dep.wanted}`);
+        const bodyMatches = issue.body && issue.body.includes(this.targetRepo);
+        
+        if (titleMatches && bodyMatches) {
+          console.log(`✓ Found existing Story: #${issue.number}`);
           return {
             number: issue.number,
             title: issue.title,
@@ -246,7 +251,7 @@ ${dep.wanted !== dep.latest ? `**Note:** Latest version is ${dep.latest}, but ${
       return null;
     } catch (error) {
       // Fail gracefully if search fails
-      console.warn(`Warning: Could not search for existing Story: ${error.message}`);
+      console.warn(`⚠️  Warning: Could not search for existing Story: ${error.message}`);
       return null;
     }
   }
@@ -256,18 +261,18 @@ ${dep.wanted !== dep.latest ? `**Note:** Latest version is ${dep.latest}, but ${
    * @param {import('./scanner').Dependency} dep
    * @param {string} ecosystem
    * @param {boolean} dryRun
-   * @returns {Promise<Story>}
+   * @returns {Promise<{story: Story, wasReused: boolean}>}
    */
   async createStoryIfNotExists(dep, ecosystem = 'nodejs', dryRun = false) {
     // Check for existing Story
     const existing = await this.findExistingStory(dep);
     if (existing) {
-      console.log(`Story already exists: #${existing.number} - ${existing.title}`);
-      return existing;
+      return { story: existing, wasReused: true };
     }
 
     // Create new Story
-    return this.createStory(dep, ecosystem, dryRun);
+    const story = await this.createStory(dep, ecosystem, dryRun);
+    return { story, wasReused: false };
   }
 }
 

@@ -153,30 +153,49 @@ async function main() {
       baseBranch: config.target.branch
     });
     
+    let createdCount = 0;
+    let reusedCount = 0;
+    let skippedCount = 0;
+    let failedCount = 0;
+    
     for (const dep of results.recommended) {
       console.log(`\nProcessing: ${dep.package} (${dep.current} → ${dep.wanted})`);
       
-      // Create Story
+      // Create Story (with duplicate detection)
       try {
-        const story = await storyCreator.createStory(dep, report.ecosystem, false);
-        console.log(`✅ Story created: ${story.url}`);
+        const { story, wasReused } = await storyCreator.createStoryIfNotExists(dep, report.ecosystem, false);
         
-        // Create PR
+        if (wasReused) {
+          console.log(`♻️  Story reused: ${story.url}`);
+          reusedCount++;
+        } else {
+          console.log(`✅ Story created: ${story.url}`);
+          createdCount++;
+        }
+        
+        // Create PR (with duplicate detection)
         try {
           const pr = await prGenerator.createPR(dep, story.number, config.governance.repository, false);
           if (pr) {
             console.log(`✅ PR created: ${pr.url}`);
+            createdCount++;
           } else {
             console.log(`⏭️  PR skipped: No changes needed (package may already be at target version)`);
+            skippedCount++;
           }
         } catch (error) {
           console.error(`❌ PR creation failed: ${error.message}`);
+          failedCount++;
         }
       } catch (error) {
         console.error(`❌ Story creation failed: ${error.message}`);
+        failedCount++;
       }
     }
     
+    console.log('\n' + '─'.repeat(80));
+    console.log(`Summary: ✅ Created: ${createdCount} | ♻️  Reused: ${reusedCount} | ⏭️  Skipped: ${skippedCount} | ❌ Failed: ${failedCount}`);
+    console.log('─'.repeat(80));
     console.log('\n✨ ARM execution complete (production).\n');
   }
 }
