@@ -164,7 +164,11 @@ async function main() {
         // Create PR
         try {
           const pr = await prGenerator.createPR(dep, story.number, config.governance.repository, false);
-          console.log(`✅ PR created: ${pr.url}`);
+          if (pr) {
+            console.log(`✅ PR created: ${pr.url}`);
+          } else {
+            console.log(`⏭️  PR skipped: No changes needed (package may already be at target version)`);
+          }
         } catch (error) {
           console.error(`❌ PR creation failed: ${error.message}`);
         }
