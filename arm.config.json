@@ -12,6 +12,7 @@
     "allowPatch": true,
     "allowMinor": true,
     "allowMajor": false,
+    "denylist": [],
     "excludePatterns": []
   },
   "execution": {
