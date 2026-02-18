@@ -125,6 +125,90 @@ The `denylist` field allows excluding specific packages from ARM processing:
 
 ---
 
+## Policy Configuration
+
+### Safe Defaults
+
+ARM enforces safe defaults to prevent breaking changes:
+
+- **`allowMajor: false`** — Major version updates are blocked by default
+- Major updates (e.g., `express` 4.x → 5.x) require manual review
+- Config validation will fail if you try to set `allowMajor: true`
+
+**Why?** Major version updates often include breaking changes. ARM prevents accidental breakage by requiring human review for major updates.
+
+### Denylist Usage
+
+The `policy.denylist` field allows excluding specific packages from ARM processing.
+
+**Configuration:**
+\`\`\`json
+{
+  \"policy\": {
+    \"allowPatch\": true,
+    \"allowMinor\": true,
+    \"allowMajor\": false,
+    \"denylist\": [\"express\", \"lodash\", \"webpack\"]
+  }
+}
+\`\`\`
+
+**When to use denylist:**
+- **Breaking changes in minor/patch** — Some packages introduce breaking changes even in minor updates
+- **External management** — Dependencies managed by another process or team
+- **Custom workflows** — Packages requiring special update procedures
+- **Temporary exclusions** — During migrations or refactoring work
+
+**Package matching rules:**
+- **Exact match only** — `\"express\"` matches `express` but not `express-session`
+- **Case-sensitive** — `\"Express\"` and `\"express\"` are different
+- **No wildcards** — Use `excludePatterns` for glob patterns like `@types/*`
+
+**Examples:**
+
+\`\`\`json
+// Exclude specific problematic packages
+{
+  \"denylist\": [\"express\", \"lodash\"]
+}
+
+// Common use case: exclude framework during migration
+{
+  \"denylist\": [\"react\", \"react-dom\"]
+}
+
+// Exclude build tools with custom workflows
+{
+  \"denylist\": [\"webpack\", \"babel-core\"]
+}
+\`\`\`
+
+### Denylist vs. Exclusion Patterns
+
+| Feature | Denylist | Exclusion Patterns |
+|---------|----------|-------------------|
+| **Matching** | Exact name | Glob patterns |
+| **Case** | Sensitive | Sensitive |
+| **Example** | `\"express\"` | `\"@types/*\"` |
+| **Use case** | Specific packages | Package families |
+| **Status** | ✅ Recommended | ⚠️ Deprecated |
+
+**Recommendation:** Use `denylist` for exact package names. Use `excludePatterns` only for glob patterns like `@types/*`.
+
+### Exclusion Logging
+
+All excluded packages are logged during filtering:
+
+\`\`\`
+⏭️  Excluded: express (denylisted)
+⏭️  Excluded: webpack@4.46.0 → 5.76.0 (major update blocked)
+⏭️  Excluded: @types/node (matches exclusion pattern)
+\`\`\`
+
+This provides visibility into why packages were skipped.
+
+---
+
 ## Example Workflow
 
 **Target repo:** `Hozyne-OpenBak/arm` has outdated `express@4.17.1`
