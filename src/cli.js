@@ -18,6 +18,7 @@ const fs = require('fs');
 const path = require('path');
 const { DependencyScanner, UpdateFilter, StoryCreator, PRGenerator } = require('./index');
 const { validateConfig, logConfigSummary } = require('./utils/config-validator');
+const { writeJobSummary } = require('./utils/summary-generator');
 
 async function main() {
   console.log('🦞 ARM v1 - GitHub Actions Execution\n');
@@ -167,13 +168,26 @@ async function main() {
     let reusedCount = 0;
     let skippedCount = 0;
     let failedCount = 0;
+    const executionResults = [];
     
     for (const dep of results.recommended) {
       console.log(`\nProcessing: ${dep.package} (${dep.current} → ${dep.wanted})`);
       
+      const result = {
+        packageName: dep.package,
+        current: dep.current,
+        wanted: dep.wanted,
+        type: dep.type,
+        storyUrl: null,
+        prUrl: null,
+        status: '❌ Failed'
+      };
+      
       // Create Story (with duplicate detection)
       try {
         const { story, wasReused } = await storyCreator.createStoryIfNotExists(dep, report.ecosystem, false);
+        
+        result.storyUrl = { number: story.number, url: story.url };
         
         if (wasReused) {
           console.log(`♻️  Story reused: ${story.url}`);
@@ -188,24 +202,35 @@ async function main() {
           const pr = await prGenerator.createPR(dep, story.number, config.governance.repository, false);
           if (pr) {
             console.log(`✅ PR created: ${pr.url}`);
+            result.prUrl = { number: pr.number, url: pr.url };
+            result.status = '✅ Created';
             createdCount++;
           } else {
             console.log(`⏭️  PR skipped: No changes needed (package may already be at target version)`);
+            result.status = '⏭️ Skipped';
             skippedCount++;
           }
         } catch (error) {
           console.error(`❌ PR creation failed: ${error.message}`);
+          result.status = '❌ PR Failed';
           failedCount++;
         }
       } catch (error) {
         console.error(`❌ Story creation failed: ${error.message}`);
+        result.status = '❌ Story Failed';
         failedCount++;
       }
+      
+      executionResults.push(result);
     }
     
     console.log('\n' + '─'.repeat(80));
     console.log(`Summary: ✅ Created: ${createdCount} | ♻️  Reused: ${reusedCount} | ⏭️  Skipped: ${skippedCount} | ❌ Failed: ${failedCount}`);
     console.log('─'.repeat(80));
+    
+    // Write GitHub Actions job summary
+    writeJobSummary(executionResults);
+    
     console.log('\n✨ ARM execution complete (production).\n');
   }
 }
