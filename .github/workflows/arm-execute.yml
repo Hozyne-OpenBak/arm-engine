@@ -39,6 +39,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
       
+      - name: Configure git identity
+        run: |
+          git config --global user.name "Hozyne-OpenBak"
+          git config --global user.email "openclawbak@gmail.com"
+      
       - name: Run ARM
         run: node src/cli.js
         env:

@@ -194,6 +194,25 @@ ${dep.wanted !== dep.latest ? `**Note:** Latest version is ${dep.latest}, but ${
   }
 
   /**
+   * Check if there are uncommitted changes
+   * @private
+   * @returns {boolean}
+   */
+  checkForChanges() {
+    try {
+      const status = execSync('git status --porcelain', {
+        cwd: this.repoPath,
+        encoding: 'utf8',
+        stdio: 'pipe'
+      }).trim();
+      
+      return status.length > 0;
+    } catch (error) {
+      throw new Error(`Failed to check git status: ${error.message}`);
+    }
+  }
+
+  /**
    * Create feature branch and apply changes
    * @private
    * @param {string} branchName
@@ -216,6 +235,23 @@ ${dep.wanted !== dep.latest ? `**Note:** Latest version is ${dep.latest}, but ${
         stdio: 'pipe'
       });
 
+      // Check if there are any changes to commit
+      const hasChanges = this.checkForChanges();
+      if (!hasChanges) {
+        console.log('⚠️  No changes detected after npm install. Package may already be at target version.');
+        console.log('   Skipping commit and push.');
+        // Clean up: switch back to base branch and delete feature branch
+        execSync(`git checkout ${this.baseBranch}`, {
+          cwd: this.repoPath,
+          stdio: 'pipe'
+        });
+        execSync(`git branch -D ${branchName}`, {
+          cwd: this.repoPath,
+          stdio: 'pipe'
+        });
+        return false;
+      }
+
       // Stage changes
       execSync('git add package.json package-lock.json', {
         cwd: this.repoPath,
@@ -234,6 +270,8 @@ ${dep.wanted !== dep.latest ? `**Note:** Latest version is ${dep.latest}, but ${
         cwd: this.repoPath,
         stdio: 'pipe'
       });
+
+      return true;
 
     } catch (error) {
       throw new Error(`Failed to apply changes: ${error.message}`);
@@ -318,7 +356,12 @@ ${dep.wanted !== dep.latest ? `**Note:** Latest version is ${dep.latest}, but ${
     }
 
     // Apply changes and push branch
-    await this.applyChanges(branchName, dep);
+    const changesApplied = await this.applyChanges(branchName, dep);
+    
+    // If no changes were applied, return null (no PR to create)
+    if (!changesApplied) {
+      return null;
+    }
 
     // Create PR via gh CLI
     try {
