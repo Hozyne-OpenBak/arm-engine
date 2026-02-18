@@ -84,11 +84,44 @@ Full schema: [config.schema.json](./config.schema.json)
 | `governance.epicNumber` | number | ✓ | - | Epic to link Stories to |
 | `policy.allowPatch` | boolean | | `true` | Allow patch updates |
 | `policy.allowMinor` | boolean | | `true` | Allow minor updates |
-| `policy.allowMajor` | boolean | | `false` | Allow major updates |
-| `policy.excludePatterns` | string[] | | `[]` | Packages to exclude (glob) |
+| `policy.allowMajor` | boolean | | `false` | Allow major updates (safe default: false) |
+| `policy.denylist` | string[] | | `[]` | Packages to exclude (exact names) |
+| `policy.excludePatterns` | string[] | | `[]` | Packages to exclude (glob patterns, deprecated) |
 | `execution.trigger` | string | | `manual` | Trigger mode (manual/cron) |
 | `execution.dryRun` | boolean | | `false` | Scan only, no Story/PR |
 | `github.authMethod` | string | | `gh-cli` | Auth method (gh-cli only for v1) |
+
+### Policy Configuration
+
+**Safe Defaults:**
+- `allowMajor` is enforced as `false` by default to prevent breaking changes
+- Major version updates require manual review and are blocked automatically
+- Config validation will fail if `allowMajor: true` is set
+
+**Denylist Usage:**
+The `denylist` field allows excluding specific packages from ARM processing:
+
+```json
+{
+  "policy": {
+    "allowPatch": true,
+    "allowMinor": true,
+    "allowMajor": false,
+    "denylist": ["express", "lodash", "webpack"]
+  }
+}
+```
+
+**When to use denylist:**
+- Packages with known breaking changes in minor/patch updates
+- Dependencies managed by another process
+- Packages with custom update workflows
+- Temporary exclusions during migration
+
+**Package matching:**
+- Exact package name only (case-sensitive)
+- No glob patterns or wildcards
+- Example: `"express"` matches `express` but not `express-session`
 
 ---
 
