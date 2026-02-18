@@ -150,7 +150,19 @@ async function main() {
     console.log('🔒 DRY RUN MODE: No API calls will be made.');
     console.log('   To execute for real, set ARM_DRY_RUN=false\n');
     
-    console.log('✨ ARM execution complete (dry-run).\n');
+    console.log('─'.repeat(80));
+    console.log('Simulating execution...\n');
+    
+    for (const dep of results.recommended) {
+      console.log(`\n📦 ${dep.package} (${dep.current} → ${dep.wanted})`);
+      console.log(`   [DRY-RUN] Would create Story in ${config.governance.repository}`);
+      console.log(`   [DRY-RUN] Would create PR in ${config.target.repository}`);
+    }
+    
+    console.log('\n' + '─'.repeat(80));
+    console.log(`[DRY-RUN] Summary: ${results.recommended.length} Story + PR pairs would be created`);
+    console.log('─'.repeat(80));
+    console.log('\n✨ ARM execution complete (dry-run).\n');
   } else {
     console.log('🚀 PRODUCTION MODE: Creating Stories and PRs...\n');
     
