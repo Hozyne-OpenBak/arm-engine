@@ -1,0 +1,59 @@
+name: ARM Execute
+
+on:
+  workflow_dispatch:
+    inputs:
+      targetRepo:
+        description: 'Target repository (owner/name)'
+        required: false
+        default: 'Hozyne-OpenBak/arm'
+        type: string
+      dryRun:
+        description: 'Dry run mode (no API calls)'
+        required: false
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+      configPath:
+        description: 'Path to config file (relative to repo root)'
+        required: false
+        default: 'arm.config.json'
+        type: string
+
+jobs:
+  execute:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout arm-engine
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run ARM
+        run: node src/cli.js
+        env:
+          GITHUB_TOKEN: ${{ secrets.ARM_TOKEN }}
+          ARM_TARGET_REPO: ${{ inputs.targetRepo }}
+          ARM_DRY_RUN: ${{ inputs.dryRun }}
+          ARM_CONFIG_PATH: ${{ inputs.configPath }}
+      
+      - name: Output Summary
+        if: always()
+        run: |
+          echo "## ARM Execution Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Target Repository:** ${{ inputs.targetRepo }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Dry Run:** ${{ inputs.dryRun }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Config Path:** ${{ inputs.configPath }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "See logs above for detailed output (detected updates + planned actions)." >> $GITHUB_STEP_SUMMARY
