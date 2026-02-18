@@ -78,6 +78,11 @@ class DependencyScanner {
    * @returns {string} - 'patch' | 'minor' | 'major'
    */
   determineChangeType(current, latest) {
+    // Handle undefined/null/missing versions
+    if (!current || !latest) {
+      return 'patch'; // Default to patch if versions are missing
+    }
+    
     // Strip leading 'v' or '^' or '~' if present
     const cleanCurrent = current.replace(/^[v^~]/, '');
     const cleanLatest = latest.replace(/^[v^~]/, '');
