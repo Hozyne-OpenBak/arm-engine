@@ -217,9 +217,9 @@ ${dep.wanted !== dep.latest ? `**Note:** Latest version is ${dep.latest}, but ${
    */
   async findExistingStory(dep) {
     try {
-      // Search for open Stories matching package and target version
-      // Note: Not including "from ${dep.current}" since current can be "unknown"
-      const searchQuery = `repo:${this.governanceRepo} is:issue is:open "${dep.package}" "to ${dep.wanted}" in:title`;
+      // Search for open Stories matching package name
+      // We'll do more specific matching (version + repo) in the loop
+      const searchQuery = `repo:${this.governanceRepo} is:issue is:open ${dep.package} in:title`;
       const command = `gh issue list --repo ${this.governanceRepo} --search "${searchQuery}" --json number,title,url,body --limit 10`;
 
       const output = execSync(command, {
