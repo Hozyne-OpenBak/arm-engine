@@ -1392,6 +1392,605 @@ npm install
 **Solution:**
 1. Fix underlying npm install issue
 2. Delete PR and branch
+
+### Issue: GitHub Actions Workflow Doesn't Appear
+
+**Symptom:** Cannot find "ARM Execute" workflow in Actions tab.
+
+**Possible causes:**
+
+**1. Wrong repository**
+- Workflow is in `arm-engine` repository, not `arm` or `openclaw-core`
+
+**Solution:**
+```bash
+# Navigate to correct repo
+https://github.com/Hozyne-OpenBak/arm-engine/actions
+```
+
+**2. Workflow file not on default branch**
+- Workflow file must be on `main` branch to appear in Actions UI
+
+**Verify:**
+```bash
+gh api repos/Hozyne-OpenBak/arm-engine/contents/.github/workflows/arm-execute.yml \
+  --jq '.name'
+```
+
+**Expected:** `arm-execute.yml`
+
+**If missing:**
+```bash
+cd arm-engine
+git checkout main
+git pull
+ls -la .github/workflows/arm-execute.yml
+```
+
+**3. Workflow file syntax error**
+- YAML parsing errors prevent workflow from loading
+
+**Validate workflow file:**
+```bash
+# Install yq (YAML processor)
+# Ubuntu/Debian
+sudo apt install yq
+
+# Validate syntax
+yq eval .github/workflows/arm-execute.yml > /dev/null
+```
+
+**If syntax error:** Fix YAML indentation/structure and commit
+
+---
+
+### Issue: "Run Workflow" Button Disabled
+
+**Symptom:** "Run workflow" dropdown is grayed out or disabled in GitHub UI.
+
+**Possible causes:**
+
+**1. Insufficient repository permissions**
+- Requires **write** access to `arm-engine` repository
+
+**Verify permissions:**
+```bash
+gh api repos/Hozyne-OpenBak/arm-engine --jq '.permissions'
+```
+
+**Expected:**
+```json
+{
+  "admin": false,
+  "push": true,
+  "pull": true
+}
+```
+
+**Solution:** Request write access from repository admin
+
+**2. Workflow has `workflow_dispatch` trigger missing**
+
+**Verify trigger in `.github/workflows/arm-execute.yml`:**
+```yaml
+on:
+  workflow_dispatch:
+    inputs:
+      # ... input definitions
+```
+
+**If missing:** Add `workflow_dispatch` trigger and commit
+
+**3. Browser/GitHub UI cache issue**
+
+**Solution:**
+- Hard refresh: `Ctrl+Shift+R` (Windows/Linux) or `Cmd+Shift+R` (Mac)
+- Clear browser cache
+- Try incognito/private browsing mode
+- Try different browser
+
+---
+
+### Issue: Workflow Job Fails Immediately
+
+**Symptom:** Workflow starts but fails within first few seconds, before ARM execution.
+
+**Possible causes:**
+
+**1. `ARM_TOKEN` secret not configured**
+
+**Error in logs:**
+```
+Error: Resource not accessible by integration
+```
+
+**Verify secret exists:**
+```bash
+# Via GitHub UI:
+# Settings → Secrets and variables → Actions → Repository secrets
+
+# Or via CLI (requires admin):
+gh secret list --repo Hozyne-OpenBak/arm-engine
+```
+
+**Expected:** `ARM_TOKEN` appears in list
+
+**If missing:** Create secret:
+1. Generate Personal Access Token (PAT):
+   - GitHub Settings → Developer settings → Personal access tokens → Fine-grained tokens
+   - Repository access: Select `arm-engine`, `openclaw-core`, `arm`
+   - Permissions:
+     - Repository: `Contents` (read & write)
+     - Repository: `Issues` (read & write)
+     - Repository: `Pull requests` (read & write)
+   - Expiration: Set appropriate expiration (90 days recommended)
+2. Add secret:
+   - `arm-engine` → Settings → Secrets → Actions → New repository secret
+   - Name: `ARM_TOKEN`
+   - Value: Paste token
+   - Save
+
+**2. npm install fails (dependency issues)**
+
+**Error in logs:**
+```
+npm ERR! code ENOENT
+npm ERR! syscall open
+```
+
+**Solution:**
+- Check `package.json` and `package-lock.json` are in sync
+- Verify Node 18 compatibility
+- Check for platform-specific dependencies
+
+**Fix:**
+```bash
+cd arm-engine
+rm -rf node_modules package-lock.json
+npm install
+npm test  # Verify tests pass
+git add package-lock.json
+git commit -m "fix: Regenerate package-lock.json"
+git push
+```
+
+**3. Checkout fails (Git/GitHub API issue)**
+
+**Error in logs:**
+```
+Error: The process 'git' failed with exit code 128
+```
+
+**Possible causes:**
+- Repository renamed or moved
+- Temporary GitHub API outage
+- Rate limit exceeded
+
+**Solution:**
+- Verify repository exists and is accessible
+- Check https://www.githubstatus.com for incidents
+- Wait 5 minutes and retry
+- Check GitHub API rate limits:
+  ```bash
+  gh api rate_limit
+  ```
+
+---
+
+### Issue: Authentication Error During ARM Execution
+
+**Symptom:** Workflow starts successfully, but ARM fails with auth error during Story/PR creation.
+
+**Error in logs:**
+```
+❌ Failed to create Story issue: HTTP 401 Unauthorized
+```
+or
+```
+gh: Bad credentials (HTTP 401)
+```
+
+**Possible causes:**
+
+**1. `ARM_TOKEN` expired**
+
+**Verify token validity:**
+```bash
+# Test token manually
+GITHUB_TOKEN=<YOUR_TOKEN> gh auth status
+```
+
+**If expired:**
+- Regenerate token (see "Issue: Workflow Job Fails Immediately")
+- Update `ARM_TOKEN` secret
+- Re-run workflow
+
+**2. Token missing required scopes**
+
+**Required scopes:**
+- `repo` (full control) **OR** fine-grained:
+  - `Contents`: read & write
+  - `Issues`: read & write
+  - `Pull requests`: read & write
+
+**Verify scopes:**
+```bash
+# Check token scopes (only works with classic tokens)
+curl -H "Authorization: token YOUR_TOKEN" \
+     https://api.github.com/user \
+     -I | grep x-oauth-scopes
+```
+
+**If scopes insufficient:**
+- Regenerate token with correct scopes
+- Update `ARM_TOKEN` secret
+
+**3. Token revoked by admin**
+
+**Solution:**
+- Contact repository admin
+- Regenerate token
+- Update secret
+
+---
+
+### Issue: Story Created But No PR
+
+**Symptom:** Workflow logs show Story created successfully, but PR creation fails.
+
+**Log excerpt:**
+```
+✅ Story created: #45
+❌ Failed to create PR: Command failed: gh pr create...
+```
+
+**Possible causes:**
+
+**1. Insufficient write access to target repository**
+
+**Verify `ARM_TOKEN` has write access to target repo:**
+```bash
+# Test manually
+GITHUB_TOKEN=<YOUR_TOKEN> gh repo view Hozyne-OpenBak/arm --json permissions
+```
+
+**Expected:**
+```json
+{
+  "permissions": {
+    "push": true
+  }
+}
+```
+
+**If `push: false`:**
+- Token needs write access to target repository
+- Regenerate token with correct repository access
+- Update `ARM_TOKEN` secret
+
+**2. Branch protection rules blocking PR creation**
+
+**Check branch protection:**
+```bash
+gh api repos/Hozyne-OpenBak/arm/branches/main/protection
+```
+
+**If restrictive rules exist:**
+- Verify token owner is in allowlist
+- Add bot user to bypass list
+- Or temporarily disable protection for testing
+
+**3. Target repository branch doesn't exist**
+
+**Error:**
+```
+error: src refspec main does not exist
+```
+
+**Solution:**
+- Verify target repository has `main` branch
+- Update `arm.config.json` if using different default branch (e.g., `master`)
+
+**4. Git configuration issues in workflow**
+
+**Verify workflow configures git identity:**
+```yaml
+- name: Configure git identity
+  run: |
+    git config --global user.name "Hozyne-OpenBak"
+    git config --global user.email "openclawbak@gmail.com"
+```
+
+**If missing:** Add step before "Run ARM"
+
+---
+
+### Issue: Workflow Creates Duplicate Stories/PRs
+
+**Symptom:** Running workflow multiple times creates duplicate Stories and PRs for the same dependency.
+
+**Log excerpt:**
+```
+📝 Story created: #47
+🔀 PR created: #14
+
+# Second run:
+📝 Story created: #48  ❌ (duplicate)
+🔀 PR created: #15     ❌ (duplicate)
+```
+
+**Expected behavior:** Second run should show "Skipped" messages.
+
+**Possible causes:**
+
+**1. Idempotency check not implemented or broken**
+
+**Verify idempotency logic in code:**
+```javascript
+// Should exist in story-creator.js
+const existingStory = await this.findExistingStory(dep);
+if (existingStory) {
+  console.log(`⏭️ Skipped: ${dep.package} (Story #${existingStory.number} already exists)`);
+  return existingStory;
+}
+```
+
+**If missing:** This is a code bug - needs Story #33 implementation
+
+**2. Story title format changed**
+
+**Idempotency relies on title matching:**
+```
+Update <package> (<language>) from <current> to <wanted>
+```
+
+**If title format changed:** Existing Stories won't be detected
+
+**Solution:**
+- Standardize Story title format
+- Or manually close duplicate Stories
+
+**3. Searching wrong repository**
+
+**Verify governance repository in config:**
+```json
+{
+  "governance": {
+    "repository": "Hozyne-OpenBak/openclaw-core"
+  }
+}
+```
+
+**If incorrect:** Update config and re-run
+
+---
+
+### Issue: GitHub API Rate Limit Exceeded
+
+**Symptom:** Workflow fails with rate limit error during Story/PR creation or scanning.
+
+**Error in logs:**
+```
+❌ Error: API rate limit exceeded for user
+```
+or
+```
+X-RateLimit-Remaining: 0
+X-RateLimit-Reset: 1708276800
+```
+
+**GitHub API limits:**
+- **Authenticated**: 5,000 requests/hour
+- **Unauthenticated**: 60 requests/hour
+
+**ARM API usage per run:**
+- Scan: ~5 requests
+- Story creation: ~3 requests per Story
+- PR creation: ~10 requests per PR
+- Idempotency checks: ~2 requests per dependency
+
+**Example:** 10 dependencies = ~150 requests
+
+**Solutions:**
+
+**1. Wait for rate limit reset**
+
+**Check reset time:**
+```bash
+gh api rate_limit --jq '.resources.core'
+```
+
+**Output:**
+```json
+{
+  "limit": 5000,
+  "remaining": 0,
+  "reset": 1708276800,  // Unix timestamp
+  "used": 5000
+}
+```
+
+**Convert reset time:**
+```bash
+date -d @1708276800
+# Mon Feb 18 07:00:00 PM UTC 2026
+```
+
+**Wait until reset time,** then re-run workflow.
+
+**2. Reduce workflow run frequency**
+
+**Best practice:**
+- **Dry-run**: Unlimited (no API calls)
+- **Production**: Max 2-3 runs per hour
+- **Schedule**: Daily or weekly cron (not hourly)
+
+**3. Batch multiple dependencies**
+
+**If many dependencies:**
+- ARM creates Stories/PRs in batch
+- One workflow run handles all dependencies
+- More efficient than multiple separate runs
+
+**4. Use fine-grained token (higher limits)**
+
+**Fine-grained PATs** may have higher limits than classic tokens.
+
+**Check if using fine-grained:**
+```bash
+# Fine-grained tokens start with: github_pat_
+# Classic tokens start with: ghp_
+```
+
+**Consider switching** if hitting limits frequently.
+
+---
+
+### Issue: Workflow Logs Show "Excluded" for All Dependencies
+
+**Symptom:** ARM scan finds dependencies, but all are excluded (none recommended).
+
+**Log excerpt:**
+```
+🔍 Scanning Hozyne-OpenBak/arm for outdated dependencies...
+✅ Scan complete: 5 dependencies found
+
+📊 Filter results: 0 recommended, 5 excluded
+
+⏭️ Excluded: express (major update blocked)
+⏭️ Excluded: lodash (denylisted)
+⏭️ Excluded: webpack (matches exclusion pattern)
+```
+
+**Possible causes:**
+
+**1. Policy too restrictive**
+
+**Check `arm.config.json` policy:**
+```json
+{
+  "policy": {
+    "allowPatch": true,
+    "allowMinor": true,
+    "allowMajor": false,  // Blocks major updates
+    "denylist": ["lodash"],  // Blocks specific packages
+    "excludePatterns": ["webpack*"]  // Blocks patterns
+  }
+}
+```
+
+**Solution:**
+- Review policy settings
+- Remove packages from denylist if safe to update
+- Adjust exclusion patterns
+- Enable major updates if reviewed manually:
+  ```json
+  {"policy": {"allowMajor": true}}
+  ```
+  **⚠️ Warning:** Major updates may have breaking changes
+
+**2. All available updates are major versions**
+
+**Example:**
+- Current: `express@4.18.0`
+- Available: `express@5.2.1` (major)
+- Policy blocks major updates
+
+**Options:**
+- Wait for minor/patch release
+- Manually review major update and override policy for specific package
+- Add exception for specific package
+
+**3. Dependencies recently updated**
+
+**Verify last update time:**
+```bash
+cd target-repo
+git log --oneline -- package.json | head -5
+```
+
+**If recently updated:** No action needed, ARM working as expected
+
+---
+
+### Issue: Workflow Summary Missing Story/PR Links
+
+**Symptom:** Job summary shows execution complete, but doesn't include Story/PR URLs.
+
+**Example summary:**
+```
+## ARM Execution Complete
+
+**Target Repository:** Hozyne-OpenBak/arm
+**Dry Run:** false
+**Config Path:** arm.config.json
+
+See logs above for detailed output (detected updates + planned actions).
+```
+
+**Missing:** Story #XX and PR #YY URLs
+
+**Possible causes:**
+
+**1. Dry-run mode enabled**
+
+**Verify input:**
+- Check workflow run page
+- Look at "This workflow run" section
+- Verify `dryRun` input value
+
+**If `dryRun: true`:**
+- Stories/PRs not created (expected behavior)
+- Links won't appear in summary
+- Re-run with `dryRun: false`
+
+**2. Story/PR creation failed**
+
+**Check execution logs:**
+- Scroll up in job logs
+- Look for error messages:
+  ```
+  ❌ Failed to create Story issue
+  ❌ Failed to create PR
+  ```
+
+**If errors found:** See troubleshooting sections above for specific errors
+
+**3. Job summary generation incomplete**
+
+**Verify "Output Summary" step ran:**
+```yaml
+- name: Output Summary
+  if: always()
+  run: |
+    echo "## ARM Execution Complete" >> $GITHUB_STEP_SUMMARY
+    # ...
+```
+
+**If step skipped or failed:**
+- Check workflow file for syntax errors
+- Verify `if: always()` condition present
+- Look for script execution errors
+
+**4. Summary script doesn't capture Story/PR URLs**
+
+**Current limitation:** Job summary is static, doesn't parse ARM output for URLs.
+
+**Workaround:**
+- Read Story/PR URLs from execution logs
+- Look for:
+  ```
+  📝 Story created: #45
+     URL: https://github.com/Hozyne-OpenBak/openclaw-core/issues/45
+  
+  🔀 PR created: #12
+     URL: https://github.com/Hozyne-OpenBak/arm/pull/12
+  ```
+
+**Future enhancement:** Parse ARM output and include URLs in job summary
+
+---
+
 3. Re-run ARM
 
 ---
