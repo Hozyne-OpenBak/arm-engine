@@ -342,7 +342,7 @@ ${dep.wanted !== dep.latest ? `**Note:** Latest version is ${dep.latest}, but ${
 
     if (dryRun) {
       // Dry-run mode: return mock PR
-      return {
+      const mockPR = {
         number: 0,
         url: `https://github.com/${this.targetRepo}/pull/0 (dry-run)`,
         branch: branchName,
@@ -350,6 +350,8 @@ ${dep.wanted !== dep.latest ? `**Note:** Latest version is ${dep.latest}, but ${
         dependency: dep,
         body
       };
+      console.log(`[DRY-RUN] Would create PR: ${mockPR.url}`);
+      return mockPR;
     }
 
     // Ensure repo is available
@@ -390,13 +392,17 @@ ${dep.wanted !== dep.latest ? `**Note:** Latest version is ${dep.latest}, but ${
       const prUrl = output;
       const prNumber = parseInt(prUrl.split('/').pop(), 10);
 
-      return {
+      const pr = {
         number: prNumber,
         url: prUrl,
         branch: branchName,
         storyNumber,
         dependency: dep
       };
+
+      console.log(`✅ PR created: ${prUrl}`);
+
+      return pr;
     } catch (error) {
       throw new Error(`Failed to create PR: ${error.message}`);
     }

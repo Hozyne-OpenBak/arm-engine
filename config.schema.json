@@ -68,12 +68,22 @@
         },
         "allowMajor": {
           "type": "boolean",
-          "description": "Allow major version updates (e.g., 1.0.0 → 2.0.0)",
-          "default": false
+          "description": "Allow major version updates (e.g., 1.0.0 → 2.0.0). Enforced as false for safety.",
+          "default": false,
+          "const": false
+        },
+        "denylist": {
+          "type": "array",
+          "description": "Exact package names to exclude from updates (case-sensitive, no wildcards)",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "examples": [["express", "lodash", "webpack"]]
         },
         "excludePatterns": {
           "type": "array",
-          "description": "Package name patterns to exclude (glob syntax)",
+          "description": "Package name patterns to exclude (glob syntax, deprecated in favor of denylist)",
           "items": {
             "type": "string"
           },
