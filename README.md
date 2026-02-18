@@ -84,11 +84,128 @@ Full schema: [config.schema.json](./config.schema.json)
 | `governance.epicNumber` | number | ✓ | - | Epic to link Stories to |
 | `policy.allowPatch` | boolean | | `true` | Allow patch updates |
 | `policy.allowMinor` | boolean | | `true` | Allow minor updates |
-| `policy.allowMajor` | boolean | | `false` | Allow major updates |
-| `policy.excludePatterns` | string[] | | `[]` | Packages to exclude (glob) |
+| `policy.allowMajor` | boolean | | `false` | Allow major updates (safe default: false) |
+| `policy.denylist` | string[] | | `[]` | Packages to exclude (exact names) |
+| `policy.excludePatterns` | string[] | | `[]` | Packages to exclude (glob patterns, deprecated) |
 | `execution.trigger` | string | | `manual` | Trigger mode (manual/cron) |
 | `execution.dryRun` | boolean | | `false` | Scan only, no Story/PR |
 | `github.authMethod` | string | | `gh-cli` | Auth method (gh-cli only for v1) |
+
+### Policy Configuration
+
+**Safe Defaults:**
+- `allowMajor` is enforced as `false` by default to prevent breaking changes
+- Major version updates require manual review and are blocked automatically
+- Config validation will fail if `allowMajor: true` is set
+
+**Denylist Usage:**
+The `denylist` field allows excluding specific packages from ARM processing:
+
+```json
+{
+  "policy": {
+    "allowPatch": true,
+    "allowMinor": true,
+    "allowMajor": false,
+    "denylist": ["express", "lodash", "webpack"]
+  }
+}
+```
+
+**When to use denylist:**
+- Packages with known breaking changes in minor/patch updates
+- Dependencies managed by another process
+- Packages with custom update workflows
+- Temporary exclusions during migration
+
+**Package matching:**
+- Exact package name only (case-sensitive)
+- No glob patterns or wildcards
+- Example: `"express"` matches `express` but not `express-session`
+
+---
+
+## Policy Configuration
+
+### Safe Defaults
+
+ARM enforces safe defaults to prevent breaking changes:
+
+- **`allowMajor: false`** — Major version updates are blocked by default
+- Major updates (e.g., `express` 4.x → 5.x) require manual review
+- Config validation will fail if you try to set `allowMajor: true`
+
+**Why?** Major version updates often include breaking changes. ARM prevents accidental breakage by requiring human review for major updates.
+
+### Denylist Usage
+
+The `policy.denylist` field allows excluding specific packages from ARM processing.
+
+**Configuration:**
+\`\`\`json
+{
+  \"policy\": {
+    \"allowPatch\": true,
+    \"allowMinor\": true,
+    \"allowMajor\": false,
+    \"denylist\": [\"express\", \"lodash\", \"webpack\"]
+  }
+}
+\`\`\`
+
+**When to use denylist:**
+- **Breaking changes in minor/patch** — Some packages introduce breaking changes even in minor updates
+- **External management** — Dependencies managed by another process or team
+- **Custom workflows** — Packages requiring special update procedures
+- **Temporary exclusions** — During migrations or refactoring work
+
+**Package matching rules:**
+- **Exact match only** — `\"express\"` matches `express` but not `express-session`
+- **Case-sensitive** — `\"Express\"` and `\"express\"` are different
+- **No wildcards** — Use `excludePatterns` for glob patterns like `@types/*`
+
+**Examples:**
+
+\`\`\`json
+// Exclude specific problematic packages
+{
+  \"denylist\": [\"express\", \"lodash\"]
+}
+
+// Common use case: exclude framework during migration
+{
+  \"denylist\": [\"react\", \"react-dom\"]
+}
+
+// Exclude build tools with custom workflows
+{
+  \"denylist\": [\"webpack\", \"babel-core\"]
+}
+\`\`\`
+
+### Denylist vs. Exclusion Patterns
+
+| Feature | Denylist | Exclusion Patterns |
+|---------|----------|-------------------|
+| **Matching** | Exact name | Glob patterns |
+| **Case** | Sensitive | Sensitive |
+| **Example** | `\"express\"` | `\"@types/*\"` |
+| **Use case** | Specific packages | Package families |
+| **Status** | ✅ Recommended | ⚠️ Deprecated |
+
+**Recommendation:** Use `denylist` for exact package names. Use `excludePatterns` only for glob patterns like `@types/*`.
+
+### Exclusion Logging
+
+All excluded packages are logged during filtering:
+
+\`\`\`
+⏭️  Excluded: express (denylisted)
+⏭️  Excluded: webpack@4.46.0 → 5.76.0 (major update blocked)
+⏭️  Excluded: @types/node (matches exclusion pattern)
+\`\`\`
+
+This provides visibility into why packages were skipped.
 
 ---
 

@@ -17,6 +17,9 @@
 const fs = require('fs');
 const path = require('path');
 const { DependencyScanner, UpdateFilter, StoryCreator, PRGenerator } = require('./index');
+const { validateConfig, logConfigSummary } = require('./utils/config-validator');
+const { writeJobSummary } = require('./utils/summary-generator');
+const { logAnnotation } = require('./utils/logger');
 
 async function main() {
   const startTime = Date.now();
@@ -55,6 +58,15 @@ async function main() {
     config = JSON.parse(fs.readFileSync(configFullPath, 'utf8'));
   } catch (error) {
     console.error(`❌ Error loading config: ${error.message}`);
+    process.exit(1);
+  }
+  
+  // Validate configuration
+  try {
+    validateConfig(config);
+    logConfigSummary(config);
+  } catch (error) {
+    console.error(`❌ Config validation failed: ${error.message}`);
     process.exit(1);
   }
   
@@ -139,7 +151,19 @@ async function main() {
     console.log('🔒 DRY RUN MODE: No API calls will be made.');
     console.log('   To execute for real, set ARM_DRY_RUN=false\n');
     
-    console.log('✨ ARM execution complete (dry-run).\n');
+    console.log('─'.repeat(80));
+    console.log('Simulating execution...\n');
+    
+    for (const dep of results.recommended) {
+      console.log(`\n📦 ${dep.package} (${dep.current} → ${dep.wanted})`);
+      console.log(`   [DRY-RUN] Would create Story in ${config.governance.repository}`);
+      console.log(`   [DRY-RUN] Would create PR in ${config.target.repository}`);
+    }
+    
+    console.log('\n' + '─'.repeat(80));
+    console.log(`[DRY-RUN] Summary: ${results.recommended.length} Story + PR pairs would be created`);
+    console.log('─'.repeat(80));
+    console.log('\n✨ ARM execution complete (dry-run).\n');
   } else {
     console.log('🚀 PRODUCTION MODE: Creating Stories and PRs...\n');
     
@@ -158,19 +182,34 @@ async function main() {
     let reusedCount = 0;
     let skippedCount = 0;
     let failedCount = 0;
+    const executionResults = [];
     
     for (const dep of results.recommended) {
       console.log(`\nProcessing: ${dep.package} (${dep.current} → ${dep.wanted})`);
+      
+      const result = {
+        packageName: dep.package,
+        current: dep.current,
+        wanted: dep.wanted,
+        type: dep.type,
+        storyUrl: null,
+        prUrl: null,
+        status: '❌ Failed'
+      };
       
       // Create Story (with duplicate detection)
       try {
         const { story, wasReused } = await storyCreator.createStoryIfNotExists(dep, report.ecosystem, false);
         
+        result.storyUrl = { number: story.number, url: story.url };
+        
         if (wasReused) {
           console.log(`♻️  Story reused: ${story.url}`);
+          logAnnotation('warning', `Story reused for ${dep.package}: ${config.governance.repository}#${story.number}`);
           reusedCount++;
         } else {
           console.log(`✅ Story created: ${story.url}`);
+          logAnnotation('notice', `Story created for ${dep.package}: ${config.governance.repository}#${story.number}`);
           createdCount++;
         }
         
@@ -179,19 +218,30 @@ async function main() {
           const pr = await prGenerator.createPR(dep, story.number, config.governance.repository, false);
           if (pr) {
             console.log(`✅ PR created: ${pr.url}`);
+            logAnnotation('notice', `PR created for ${dep.package}: ${config.target.repository}#${pr.number}`);
+            result.prUrl = { number: pr.number, url: pr.url };
+            result.status = '✅ Created';
             createdCount++;
           } else {
             console.log(`⏭️  PR skipped: No changes needed (package may already be at target version)`);
+            logAnnotation('warning', `PR skipped for ${dep.package}: No changes needed`);
+            result.status = '⏭️ Skipped';
             skippedCount++;
           }
         } catch (error) {
           console.error(`❌ PR creation failed: ${error.message}`);
+          logAnnotation('error', `PR creation failed for ${dep.package}: ${error.message}`);
+          result.status = '❌ PR Failed';
           failedCount++;
         }
       } catch (error) {
         console.error(`❌ Story creation failed: ${error.message}`);
+        logAnnotation('error', `Story creation failed for ${dep.package}: ${error.message}`);
+        result.status = '❌ Story Failed';
         failedCount++;
       }
+      
+      executionResults.push(result);
     }
     
     const elapsedTime = ((Date.now() - startTime) / 1000).toFixed(2);
@@ -209,6 +259,10 @@ async function main() {
     console.log(`\n⏱️  Elapsed time: ${elapsedTime}s`);
     console.log(`🎯 Success rate: ${Math.round((createdCount + reusedCount) / results.recommended.length * 100)}%`);
     console.log('\n' + '='.repeat(80));
+    
+    // Write GitHub Actions job summary
+    writeJobSummary(executionResults);
+    
     console.log('\n✨ ARM execution complete (production).\n');
   }
 }
