@@ -4,13 +4,14 @@
  * Automatically creates PRs in the target repository that update
  * dependencies and reference the corresponding Story issue.
  * 
- * Story: #17
- * Epic: #13
+ * Story: #17, #35
+ * Epic: #13, #30
  */
 
 const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const { retryWithBackoff } = require('./utils/retry');
 
 /**
  * @typedef {Object} PR
@@ -287,15 +288,17 @@ ${dep.wanted !== dep.latest ? `**Note:** Latest version is ${dep.latest}, but ${
     try {
       const expectedBranch = this.generateBranchName(dep);
       
-      // Search for open PRs matching package name
-      // We'll do more specific matching (version + branch) in the loop
+      // Search for open PRs matching package name with retry logic
       const searchQuery = `repo:${this.targetRepo} is:pr is:open ${dep.package} in:title`;
       const command = `gh pr list --repo ${this.targetRepo} --search "${searchQuery}" --json number,title,url,headRefName --limit 10`;
 
-      const output = execSync(command, {
-        encoding: 'utf8',
-        stdio: 'pipe'
-      }).trim();
+      // Wrap gh CLI call with retry logic
+      const output = await retryWithBackoff(async () => {
+        return execSync(command, {
+          encoding: 'utf8',
+          stdio: 'pipe'
+        }).trim();
+      });
 
       if (!output) return null;
 
@@ -372,7 +375,7 @@ ${dep.wanted !== dep.latest ? `**Note:** Latest version is ${dep.latest}, but ${
       return null;
     }
 
-    // Create PR via gh CLI
+    // Create PR via gh CLI with retry logic
     try {
       // Write body to temp file to avoid shell escaping issues
       const tempFile = `/tmp/arm-pr-body-${Date.now()}.md`;
@@ -380,10 +383,13 @@ ${dep.wanted !== dep.latest ? `**Note:** Latest version is ${dep.latest}, but ${
 
       const command = `gh pr create --repo ${this.targetRepo} --head ${branchName} --base ${this.baseBranch} --title "${title.replace(/"/g, '\\"')}" --body-file "${tempFile}"`;
 
-      const output = execSync(command, {
-        encoding: 'utf8',
-        stdio: 'pipe'
-      }).trim();
+      // Wrap gh CLI call with retry logic
+      const output = await retryWithBackoff(async () => {
+        return execSync(command, {
+          encoding: 'utf8',
+          stdio: 'pipe'
+        }).trim();
+      });
 
       // Clean up temp file
       fs.unlinkSync(tempFile);
