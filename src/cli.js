@@ -17,6 +17,7 @@
 const fs = require('fs');
 const path = require('path');
 const { DependencyScanner, UpdateFilter, StoryCreator, PRGenerator } = require('./index');
+const { logAnnotation } = require('./utils/logger');
 
 async function main() {
   console.log('🦞 ARM v1 - GitHub Actions Execution\n');
@@ -167,9 +168,11 @@ async function main() {
         
         if (wasReused) {
           console.log(`♻️  Story reused: ${story.url}`);
+          logAnnotation('warning', `Story reused for ${dep.package}: ${config.governance.repository}#${story.number}`);
           reusedCount++;
         } else {
           console.log(`✅ Story created: ${story.url}`);
+          logAnnotation('notice', `Story created for ${dep.package}: ${config.governance.repository}#${story.number}`);
           createdCount++;
         }
         
@@ -178,17 +181,21 @@ async function main() {
           const pr = await prGenerator.createPR(dep, story.number, config.governance.repository, false);
           if (pr) {
             console.log(`✅ PR created: ${pr.url}`);
+            logAnnotation('notice', `PR created for ${dep.package}: ${config.target.repository}#${pr.number}`);
             createdCount++;
           } else {
             console.log(`⏭️  PR skipped: No changes needed (package may already be at target version)`);
+            logAnnotation('warning', `PR skipped for ${dep.package}: No changes needed`);
             skippedCount++;
           }
         } catch (error) {
           console.error(`❌ PR creation failed: ${error.message}`);
+          logAnnotation('error', `PR creation failed for ${dep.package}: ${error.message}`);
           failedCount++;
         }
       } catch (error) {
         console.error(`❌ Story creation failed: ${error.message}`);
+        logAnnotation('error', `Story creation failed for ${dep.package}: ${error.message}`);
         failedCount++;
       }
     }
