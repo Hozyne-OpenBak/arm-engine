@@ -285,7 +285,11 @@ ${dep.wanted !== dep.latest ? `**Note:** Latest version is ${dep.latest}, but ${
    */
   async findExistingPR(dep) {
     try {
-      const searchQuery = `repo:${this.targetRepo} is:pr "${dep.package}" in:title`;
+      const expectedBranch = this.generateBranchName(dep);
+      
+      // Search for open PRs matching package and target version
+      // Note: Not including "from ${dep.current}" since current can be "unknown"
+      const searchQuery = `repo:${this.targetRepo} is:pr is:open "${dep.package}" "to ${dep.wanted}" in:title`;
       const command = `gh pr list --repo ${this.targetRepo} --search "${searchQuery}" --json number,title,url,headRefName --limit 10`;
 
       const output = execSync(command, {
@@ -297,11 +301,14 @@ ${dep.wanted !== dep.latest ? `**Note:** Latest version is ${dep.latest}, but ${
 
       const prs = JSON.parse(output);
       
-      // Look for exact match
+      // Look for exact match by branch name OR package + target version
       for (const pr of prs) {
-        if (pr.title.includes(`${dep.package}`) && 
-            pr.title.includes(`from ${dep.current}`) &&
-            pr.title.includes(`to ${dep.wanted}`)) {
+        const branchMatches = pr.headRefName === expectedBranch;
+        const titleMatches = pr.title.includes(`${dep.package}`) && 
+                           pr.title.includes(`to ${dep.wanted}`);
+        
+        if (branchMatches || titleMatches) {
+          console.log(`✓ Found existing PR: #${pr.number}`);
           return {
             number: pr.number,
             url: pr.url,
@@ -315,7 +322,7 @@ ${dep.wanted !== dep.latest ? `**Note:** Latest version is ${dep.latest}, but ${
       return null;
     } catch (error) {
       // Fail gracefully if search fails
-      console.warn(`Warning: Could not search for existing PR: ${error.message}`);
+      console.warn(`⚠️  Warning: Could not search for existing PR: ${error.message}`);
       return null;
     }
   }
