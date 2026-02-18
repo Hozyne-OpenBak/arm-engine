@@ -4,8 +4,12 @@
  * Filters outdated dependencies based on update policy
  * (patch/minor/major) and exclusion patterns.
  * 
- * Story: #15
- * Epic: #13
+ * Implements:
+ * - T32.3: Major update blocking enforcement
+ * - T32.6: Major update block logging
+ * 
+ * Story: #15, #32
+ * Epic: #13, #30
  */
 
 const { minimatch } = require('minimatch');
@@ -80,6 +84,7 @@ class UpdateFilter {
     for (const dep of report.dependencies) {
       // Check exclusion patterns
       if (this.isExcluded(dep.package)) {
+        console.log(`⏭️  Excluded: ${dep.package} (matches exclusion pattern)`);
         excluded.push({
           dep,
           reason: `Matches exclusion pattern`
@@ -89,6 +94,13 @@ class UpdateFilter {
 
       // Check change type policy
       if (!this.isChangeTypeAllowed(dep.type)) {
+        // Special logging for major update blocks (T32.6)
+        if (dep.type === 'major') {
+          console.log(`⏭️  Excluded: ${dep.package}@${dep.current} → ${dep.wanted} (major update blocked)`);
+        } else {
+          console.log(`⏭️  Excluded: ${dep.package} (${dep.type} updates not allowed)`);
+        }
+        
         excluded.push({
           dep,
           reason: `${dep.type.charAt(0).toUpperCase() + dep.type.slice(1)} updates not allowed by policy`
