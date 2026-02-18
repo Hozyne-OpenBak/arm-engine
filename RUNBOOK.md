@@ -475,6 +475,440 @@ A future enhancement to restrict ARM PRs to documentation-only changes, reducing
 
 ---
 
+## GitHub Actions Execution
+
+### Overview
+
+ARM can be executed automatically via **GitHub Actions workflow** in the `arm-engine` repository. This is the **recommended production method** for scheduled and on-demand execution.
+
+**Benefits:**
+- ✅ No local setup required
+- ✅ Centralized execution logs
+- ✅ Consistent environment (Ubuntu latest, Node 18)
+- ✅ Audit trail in GitHub Actions UI
+- ✅ Configurable via workflow inputs
+
+**Workflow file:** `.github/workflows/arm-execute.yml`
+
+---
+
+### Triggering the Workflow
+
+#### Manual Trigger via GitHub UI
+
+1. Navigate to **`arm-engine`** repository
+2. Click **Actions** tab
+3. Select **"ARM Execute"** workflow (left sidebar)
+4. Click **"Run workflow"** dropdown (top-right)
+5. Configure inputs:
+   - **Use workflow from:** `main` (branch)
+   - **Target repository:** `Hozyne-OpenBak/arm` (default)
+   - **Dry run mode:** `true` or `false`
+   - **Config path:** `arm.config.json` (default)
+6. Click **"Run workflow"** button
+
+**Workflow starts immediately** and appears in the workflow runs list.
+
+---
+
+#### Manual Trigger via GitHub CLI
+
+```bash
+# Dry-run mode (recommended first)
+gh workflow run arm-execute.yml \
+  --repo Hozyne-OpenBak/arm-engine \
+  -f targetRepo=Hozyne-OpenBak/arm \
+  -f dryRun=true \
+  -f configPath=arm.config.json
+
+# Production mode (creates Stories + PRs)
+gh workflow run arm-execute.yml \
+  --repo Hozyne-OpenBak/arm-engine \
+  -f dryRun=false
+
+# Check workflow status
+gh run list --repo Hozyne-OpenBak/arm-engine --workflow=arm-execute.yml --limit 5
+```
+
+---
+
+### Workflow Inputs
+
+| Input | Description | Default | Required |
+|-------|-------------|---------|----------|
+| `targetRepo` | Target repository (owner/name) | `Hozyne-OpenBak/arm` | No |
+| `dryRun` | Dry run mode (`true` = no API calls) | `true` | No |
+| `configPath` | Path to config file (relative to repo root) | `arm.config.json` | No |
+
+**Input validation:**
+- `targetRepo`: Must be valid GitHub owner/repo format
+- `dryRun`: Choice dropdown (`true` or `false`)
+- `configPath`: Must exist in `arm-engine` repository
+
+---
+
+### Workflow Steps
+
+The workflow executes these steps:
+
+1. **Checkout arm-engine** — Clones repository
+2. **Setup Node.js** — Installs Node 18 with npm cache
+3. **Install dependencies** — Runs `npm ci`
+4. **Configure git identity** — Sets commit author
+5. **Run ARM** — Executes `node src/cli.js` with environment variables
+6. **Output Summary** — Generates GitHub Actions job summary
+
+**Environment variables set automatically:**
+- `GITHUB_TOKEN`: Secret `ARM_TOKEN` (required for GitHub API)
+- `ARM_TARGET_REPO`: From `targetRepo` input
+- `ARM_DRY_RUN`: From `dryRun` input
+- `ARM_CONFIG_PATH`: From `configPath` input
+
+---
+
+### Reading Workflow Logs
+
+#### Access Logs
+
+1. Navigate to **Actions** tab in `arm-engine`
+2. Click on the workflow run (e.g., "ARM Execute #42")
+3. Click on job name: **"execute"**
+4. View real-time or completed logs
+
+#### Log Structure
+
+```
+> Checkout arm-engine
+✓ Checkout complete (2s)
+
+> Setup Node.js
+✓ Node.js 18.x installed (1s)
+
+> Install dependencies
+✓ Dependencies installed (5s)
+
+> Configure git identity
+✓ Git identity configured (0s)
+
+> Run ARM
+🔍 Scanning Hozyne-OpenBak/arm for outdated dependencies...
+✅ Scan complete: 3 dependencies found
+
+📊 Filter results: 2 recommended, 1 excluded
+
+⏭️ Excluded: express (major update blocked)
+
+📝 Story created: #45
+   URL: https://github.com/Hozyne-OpenBak/openclaw-core/issues/45
+
+🔀 PR created: #12
+   URL: https://github.com/Hozyne-OpenBak/arm/pull/12
+   Branch: arm/update-lodash-4-17-22
+
+✅ ARM execution complete (15s)
+
+> Output Summary
+✓ Summary generated (0s)
+```
+
+#### Key Log Markers
+
+Look for these patterns in logs:
+
+**Success indicators:**
+- `✅ Scan complete: X dependencies found`
+- `📝 Story created: #XX`
+- `🔀 PR created: #XX`
+- `✅ ARM execution complete`
+
+**Exclusion indicators:**
+- `⏭️ Excluded: <package> (reason)`
+- Common reasons: `denylisted`, `major update blocked`, `matches exclusion pattern`
+
+**Error indicators:**
+- `❌ Error:` or `Error:` prefix
+- Stack traces
+- GitHub API error messages
+
+---
+
+### Job Summary
+
+After workflow completes, a **job summary** appears at the bottom of the job page.
+
+**Example summary:**
+
+```
+## ARM Execution Complete
+
+**Target Repository:** Hozyne-OpenBak/arm
+**Dry Run:** false
+**Config Path:** arm.config.json
+
+See logs above for detailed output (detected updates + planned actions).
+```
+
+**How to access:**
+1. Go to workflow run page
+2. Scroll to bottom
+3. Look for "Job summary" section
+
+---
+
+### Common Scenarios
+
+#### Scenario 1: First Execution (Dry-Run)
+
+**Goal:** Test configuration without creating Stories/PRs
+
+**Steps:**
+1. Trigger workflow with `dryRun=true`
+2. Wait for completion (~30s)
+3. Review logs for detected updates
+4. Verify filter exclusions are correct
+5. Check Story/PR previews (not created)
+
+**Expected log excerpt:**
+```
+📝 Story preview:
+   Title: Update lodash from 4.17.20 to 4.17.22
+   Epic: #30
+   (dry-run, Story not created)
+
+🔀 PR preview:
+   Title: [Story #999] Update lodash
+   (dry-run, PR not created)
+```
+
+---
+
+#### Scenario 2: Production Execution
+
+**Goal:** Create real Stories and PRs
+
+**Prerequisites:**
+- Dry-run completed successfully
+- Configuration validated
+- `ARM_TOKEN` secret configured with correct scopes
+
+**Steps:**
+1. Trigger workflow with `dryRun=false`
+2. Wait for completion (~45s)
+3. Extract Story URL from logs
+4. Extract PR URL from logs
+5. Manually review Story and PR
+6. Approve and merge PR (human review required)
+
+**Expected log excerpt:**
+```
+📝 Story created: #45
+   URL: https://github.com/Hozyne-OpenBak/openclaw-core/issues/45
+
+🔀 PR created: #12
+   URL: https://github.com/Hozyne-OpenBak/arm/pull/12
+   Branch: arm/update-lodash-4-17-22
+```
+
+**Next actions:**
+- Navigate to Story URL → Review details
+- Navigate to PR URL → Review code changes
+- Approve PR → Merge → Story auto-closes
+
+---
+
+#### Scenario 3: Idempotent Re-Run
+
+**Goal:** Verify ARM doesn't create duplicate Stories/PRs
+
+**Setup:**
+- Previous run created Story #45 + PR #12
+- PR is still open (not merged)
+
+**Steps:**
+1. Trigger workflow again with same config
+2. Wait for completion
+3. Review logs for "Skipped" messages
+
+**Expected log excerpt:**
+```
+🔍 Scanning Hozyne-OpenBak/arm for outdated dependencies...
+✅ Scan complete: 3 dependencies found
+
+📊 Filter results: 2 recommended, 1 excluded
+
+⏭️ Skipped: lodash (Story #45 already exists)
+⏭️ Skipped: minimist (Story #46 already exists)
+
+✅ No new Stories or PRs created (all up-to-date or already tracked)
+```
+
+**Validation:**
+- No duplicate Stories created
+- No duplicate PRs created
+- Existing open Stories/PRs remain unchanged
+
+---
+
+#### Scenario 4: Dry-Run After Config Change
+
+**Goal:** Validate new denylist or policy change
+
+**Setup:**
+- Updated `arm.config.json` in `arm-engine` repo
+- Added `express` to `policy.denylist`
+
+**Steps:**
+1. Commit and push config change to `main` branch
+2. Trigger workflow with `dryRun=true`
+3. Review logs for exclusion messages
+
+**Expected log excerpt:**
+```
+⏭️ Excluded: express (denylisted)
+
+📊 Filter results: 1 recommended, 2 excluded
+```
+
+**Validation:**
+- `express` appears in exclusions
+- No Story/PR preview for `express`
+- Other packages still recommended
+
+---
+
+### Monitoring & Observability
+
+#### Workflow Run Status
+
+Check workflow status via CLI:
+
+```bash
+# List recent runs
+gh run list --repo Hozyne-OpenBak/arm-engine --workflow=arm-execute.yml --limit 10
+
+# View specific run
+gh run view <RUN_ID> --repo Hozyne-OpenBak/arm-engine --log
+
+# Watch live run
+gh run watch <RUN_ID> --repo Hozyne-OpenBak/arm-engine
+```
+
+#### Success Criteria
+
+**Workflow succeeded if:**
+- ✅ Job status: `success` (green checkmark)
+- ✅ Exit code: `0`
+- ✅ Logs contain: `✅ ARM execution complete`
+- ✅ No `Error:` messages in logs
+
+**Dry-run succeeded if:**
+- ✅ Story/PR previews shown
+- ✅ No actual Stories/PRs created
+- ✅ Exit code: `0`
+
+**Production run succeeded if:**
+- ✅ Story URLs logged
+- ✅ PR URLs logged
+- ✅ Stories exist in governance repo
+- ✅ PRs exist in target repo
+
+---
+
+### Best Practices
+
+#### 1. Always Dry-Run First
+
+**Rule:** Run `dryRun=true` before every production execution.
+
+**Why:**
+- Catch configuration errors early
+- Preview what will be created
+- Validate filter logic
+- No cost (no API calls)
+
+#### 2. Review Logs Immediately
+
+**Rule:** Check workflow logs within 5 minutes of completion.
+
+**Why:**
+- Identify failures quickly
+- Extract Story/PR URLs for review
+- Catch GitHub API rate limit warnings
+
+#### 3. Coordinate with Team
+
+**Rule:** Announce workflow runs in team chat.
+
+**Why:**
+- Avoid simultaneous runs (potential conflicts)
+- Share Story/PR URLs for review
+- Build awareness of ARM activity
+
+#### 4. Schedule During Low-Activity Windows
+
+**Rule:** Run production workflows during off-peak hours (e.g., 02:00 UTC).
+
+**Why:**
+- Minimize disruption to developers
+- Reduce merge conflicts
+- Lower GitHub API traffic
+
+#### 5. Monitor Rate Limits
+
+**Rule:** Check GitHub API rate limits before and after runs.
+
+```bash
+gh api rate_limit --jq '.resources.core'
+```
+
+**Why:**
+- Avoid hitting rate limits (5000/hour for authenticated)
+- Plan multiple runs accordingly
+- Detect anomalies (unexpected consumption)
+
+#### 6. Keep ARM_TOKEN Scoped
+
+**Rule:** Use fine-grained token with minimum required scopes.
+
+**Required scopes:**
+- `repo` (full control) or:
+  - `public_repo` (for public repos)
+  - `repo:status`, `repo_deployment` (for private repos)
+
+**Why:**
+- Principle of least privilege
+- Limit blast radius of token compromise
+- Easier to audit and rotate
+
+#### 7. Pin Workflow Node Version
+
+**Rule:** Keep `node-version: '18'` in workflow (don't use `latest`).
+
+**Why:**
+- Predictable behavior
+- Avoid breaking changes
+- Easier debugging
+
+---
+
+### Troubleshooting GitHub Actions Runs
+
+See [Troubleshooting](#troubleshooting) section for detailed error resolution.
+
+**Quick reference:**
+
+| Symptom | Likely Cause | Fix |
+|---------|--------------|-----|
+| Workflow doesn't appear | Wrong repository | Check you're in `arm-engine` repo |
+| "Run workflow" disabled | Insufficient permissions | Verify write access to `arm-engine` |
+| Job fails immediately | `ARM_TOKEN` secret missing | Add secret in repo settings |
+| Auth error during run | Token expired or invalid | Regenerate token, update secret |
+| Story created, no PR | Write access to target repo | Check token scopes for target repo |
+| Duplicate Stories | Idempotency bug | Check Story detection logic |
+| Rate limit error | Too many API calls | Wait for rate limit reset (check headers) |
+
+---
+
 ## Manual Execution Workflow
 
 ### Step 1: Pre-Flight Checks
