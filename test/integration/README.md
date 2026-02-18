@@ -313,3 +313,153 @@ git push
 **Last Updated:** 2026-02-18  
 **Story:** #18  
 **Epic:** #13
+
+---
+
+## GitHub Actions Integration Test
+
+**Story:** #36  
+**Epic:** #30  
+**Script:** `test-github-actions.sh`
+
+Validates the ARM GitHub Actions workflow execution with comprehensive test scenarios.
+
+### Prerequisites
+
+- GitHub CLI (`gh`) authenticated with `GITHUB_TOKEN`
+- Access to `Hozyne-OpenBak/arm-engine` repository
+- `ARM_TOKEN` secret configured (for production tests)
+- Bash shell
+
+### Quick Start
+
+**Safe test (dry-run only, no API calls):**
+```bash
+cd test/integration
+chmod +x test-github-actions.sh
+./test-github-actions.sh --dry-run-only --verbose
+```
+
+**Full test suite (requires ARM_TOKEN):**
+```bash
+export GITHUB_TOKEN="ghp_..."
+export ARM_TOKEN="ghp_..."  # Must have repo scope
+./test-github-actions.sh --production --verbose
+```
+
+### Test Scenarios
+
+| Test | Description | Requires ARM_TOKEN |
+|------|-------------|-------------------|
+| **Dry-run mode** | Validates workflow runs without API calls | No |
+| **Production mode** | Creates actual Stories and PRs | Yes |
+| **Idempotency** | Verifies duplicate detection on re-run | Yes |
+| **Error handling** | Tests graceful failure with invalid config | No |
+
+### Validation Checks
+
+#### Dry-Run Mode
+- ✅ Workflow completes successfully
+- ✅ "DRY RUN MODE" indicator present
+- ✅ No Stories or PRs created
+- ✅ Execution summary generated
+
+#### Production Mode
+- ✅ Workflow completes successfully
+- ✅ Story URLs logged (if outdated deps found)
+- ✅ PR URLs logged (if outdated deps found)
+- ✅ Job summary generated
+- ✅ GitHub Actions annotations present
+
+#### Idempotency
+- ✅ Second run detects existing Stories
+- ✅ "Story reused" (♻️) messages present
+- ✅ No duplicate Stories created
+
+### Output Example
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ARM GitHub Actions Integration Tests
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ℹ Configuration:
+   Repository: Hozyne-OpenBak/arm-engine
+   Target: Hozyne-OpenBak/arm
+   Workflow: arm-execute.yml
+   Mode: Dry-run only
+
+✅ Prerequisites validated
+
+ℹ Test 1: Dry-run mode execution
+   Workflow run ID: 123456789
+   ✓ Dry-run mode confirmed
+   ✓ No API calls made (as expected)
+   ✓ Execution summary present
+✅ Dry-run mode test passed
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                          TEST SUMMARY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Total tests:   1
+  Passed:        1
+  Failed:        0
+
+✅ All tests passed! 🎉
+```
+
+### Troubleshooting
+
+**Error: "GitHub CLI (gh) not found"**
+- Install GitHub CLI: https://cli.github.com/
+
+**Error: "GITHUB_TOKEN not set"**
+```bash
+export GITHUB_TOKEN=$(gh auth token)
+```
+
+**Error: "GitHub CLI not authenticated"**
+```bash
+gh auth login
+```
+
+**Error: "ARM_TOKEN not set" (production tests)**
+- Ensure `ARM_TOKEN` is configured in repository secrets
+- Or export for local testing: `export ARM_TOKEN="ghp_..."`
+
+**Workflow hangs or times out**
+- Check workflow status: `gh run list --repo Hozyne-OpenBak/arm-engine`
+- View logs: `gh run view <run-id> --log --repo Hozyne-OpenBak/arm-engine`
+- Increase timeout: Edit `wait_for_run` max_wait parameter in script
+
+### CI Integration (Future)
+
+This test can be integrated into CI pipelines:
+
+```yaml
+- name: Run Integration Tests
+  run: |
+    cd test/integration
+    ./test-github-actions.sh --dry-run-only --verbose
+  env:
+    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+```
+
+For production CI tests (rare, due to API rate limits):
+```yaml
+- name: Run Production Integration Tests
+  if: github.event_name == 'schedule' # Weekly cron
+  run: |
+    cd test/integration
+    ./test-github-actions.sh --production
+  env:
+    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    ARM_TOKEN: ${{ secrets.ARM_TOKEN }}
+```
+
+---
+
+**Related Documentation:**
+- [ARM Runbook](../../RUNBOOK.md) - GitHub Actions execution guide
+- [GitHub Actions Workflow](../../.github/workflows/arm-execute.yml) - Workflow definition
