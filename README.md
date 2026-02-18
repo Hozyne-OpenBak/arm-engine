@@ -14,7 +14,130 @@ ARM (Autonomous Repo Maintenance) is an OpenClaw-powered agent that autonomously
 
 ---
 
-## Quick Start
+
+---
+
+## GitHub Actions Quick Start
+
+**Recommended:** Use GitHub Actions workflow for automated, scheduled, or manual ARM execution.
+
+### Prerequisites
+
+1. **ARM_TOKEN secret** configured in repository settings
+   - Navigate to: `Settings` → `Secrets and variables` → `Actions`
+   - Create new secret: `ARM_TOKEN`
+   - Value: GitHub personal access token with `repo` scope
+
+2. **Workflow file** already exists: [`.github/workflows/arm-execute.yml`](.github/workflows/arm-execute.yml)
+
+3. **Configuration file** exists: `arm.config.json` in repository root
+
+---
+
+### Quick Run (Dry-Run Mode)
+
+**Safest option:** Test workflow without creating Stories or PRs.
+
+1. Go to **Actions** tab in this repository
+2. Select **"ARM Execute"** workflow (left sidebar)
+3. Click **"Run workflow"** dropdown (top-right)
+4. Set **Dry run mode:** `true` ✅ (default)
+5. Click **"Run workflow"** button
+
+**Result:** Workflow scans for outdated dependencies and logs results without creating Issues or PRs.
+
+---
+
+### Production Run (Creates Stories + PRs)
+
+**⚠️ Use with caution:** Creates real GitHub Issues and Pull Requests.
+
+1. Go to **Actions** tab
+2. Select **"ARM Execute"** workflow
+3. Click **"Run workflow"** dropdown
+4. Set **Dry run mode:** `false` ⚠️
+5. Optionally change **Target repository** (default: `Hozyne-OpenBak/arm`)
+6. Click **"Run workflow"** button
+
+**Result:** Workflow creates Stories in governance repo and PRs in target repo for recommended updates.
+
+---
+
+### View Results
+
+**Workflow Logs:**
+- Click on the workflow run to see detailed logs
+- Look for `✅ Story created:` and `✅ PR created:` messages
+
+**Job Summary:**
+- Scroll to bottom of workflow run page
+- View markdown table with all created Stories and PRs
+
+**Annotations:**
+- Click **"Annotations"** tab (top bar)
+- Review notices (✅ successes), warnings (⚠️ retries), and errors (❌ failures)
+
+---
+
+### Workflow Inputs
+
+| Input | Description | Default | Required |
+|-------|-------------|---------|----------|
+| `targetRepo` | Target repository (owner/name) | `Hozyne-OpenBak/arm` | No |
+| `dryRun` | Dry run mode (no API calls) | `true` | No |
+| `configPath` | Path to config file | `arm.config.json` | No |
+
+**Example via GitHub CLI:**
+```bash
+# Dry-run (safe)
+gh workflow run arm-execute.yml \
+  --repo Hozyne-OpenBak/arm-engine \
+  -f dryRun=true
+
+# Production (creates Stories + PRs)
+gh workflow run arm-execute.yml \
+  --repo Hozyne-OpenBak/arm-engine \
+  -f dryRun=false \
+  -f targetRepo=Hozyne-OpenBak/my-repo
+```
+
+---
+
+### Troubleshooting
+
+**Workflow fails immediately:**
+- ✅ Verify `ARM_TOKEN` secret exists
+- ✅ Check token has `repo` scope
+- ✅ Confirm `arm.config.json` is valid JSON
+
+**No Stories or PRs created:**
+- ℹ️ Check logs for "No outdated dependencies found"
+- ℹ️ Review "Excluded" messages (e.g., major updates blocked)
+- ℹ️ Verify filter policy in `arm.config.json`
+
+**Rate limit errors:**
+- ⏱️ Wait for rate limit reset (shown in logs)
+- ⏱️ Retry logic automatically handles transient failures (3 attempts)
+
+For detailed troubleshooting, see [RUNBOOK.md - Troubleshooting](./RUNBOOK.md#troubleshooting-github-actions-runs).
+
+---
+
+### Full Documentation
+
+- **[RUNBOOK.md](./RUNBOOK.md)** - Complete operational guide
+  - GitHub Actions execution details
+  - Workflow inputs and outputs
+  - Monitoring and troubleshooting
+  - Best practices
+- **[ARCHITECTURE.md](./ARCHITECTURE.md)** - Technical design
+- **[Test Integration](./test/integration/README.md)** - Integration testing guide
+
+---
+
+## CLI Quick Start
+
+## CLI Quick Start (Alternative)
 
 ### Prerequisites
 
