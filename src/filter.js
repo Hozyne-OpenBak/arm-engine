@@ -2,10 +2,12 @@
  * filter.js - Update Policy Filter
  * 
  * Filters outdated dependencies based on update policy
- * (patch/minor/major) and exclusion patterns.
+ * (patch/minor/major), denylist, and exclusion patterns.
  * 
  * Implements:
  * - T32.3: Major update blocking enforcement
+ * - T32.4: Denylist filter implementation
+ * - T32.5: Denylist exclusion logging
  * - T32.6: Major update block logging
  * 
  * Story: #15, #32
@@ -19,7 +21,8 @@ const { minimatch } = require('minimatch');
  * @property {boolean} allowPatch - Allow patch updates (1.0.0 → 1.0.1)
  * @property {boolean} allowMinor - Allow minor updates (1.0.0 → 1.1.0)
  * @property {boolean} allowMajor - Allow major updates (1.0.0 → 2.0.0)
- * @property {string[]} excludePatterns - Package name patterns to exclude (glob)
+ * @property {string[]} denylist - Exact package names to exclude (case-sensitive)
+ * @property {string[]} excludePatterns - Package name patterns to exclude (glob, deprecated)
  */
 
 /**
@@ -37,8 +40,19 @@ class UpdateFilter {
       allowPatch: policy.allowPatch !== undefined ? policy.allowPatch : true,
       allowMinor: policy.allowMinor !== undefined ? policy.allowMinor : true,
       allowMajor: policy.allowMajor !== undefined ? policy.allowMajor : false,
+      denylist: policy.denylist || [],
       excludePatterns: policy.excludePatterns || []
     };
+  }
+
+  /**
+   * Check if package is in denylist (exact match, case-sensitive)
+   * @private
+   * @param {string} packageName
+   * @returns {boolean}
+   */
+  isDenylisted(packageName) {
+    return this.policy.denylist.includes(packageName);
   }
 
   /**
@@ -82,7 +96,17 @@ class UpdateFilter {
     const excluded = [];
 
     for (const dep of report.dependencies) {
-      // Check exclusion patterns
+      // Check denylist first (T32.4, T32.5)
+      if (this.isDenylisted(dep.package)) {
+        console.log(`⏭️  Excluded: ${dep.package} (denylisted)`);
+        excluded.push({
+          dep,
+          reason: `Package is denylisted`
+        });
+        continue;
+      }
+
+      // Check exclusion patterns (deprecated, backward compatibility)
       if (this.isExcluded(dep.package)) {
         console.log(`⏭️  Excluded: ${dep.package} (matches exclusion pattern)`);
         excluded.push({
@@ -94,7 +118,7 @@ class UpdateFilter {
 
       // Check change type policy
       if (!this.isChangeTypeAllowed(dep.type)) {
-        // Special logging for major update blocks (T32.6)
+        // Special logging for major update blocks (T32.3, T32.6)
         if (dep.type === 'major') {
           console.log(`⏭️  Excluded: ${dep.package}@${dep.current} → ${dep.wanted} (major update blocked)`);
         } else {
