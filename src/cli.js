@@ -22,6 +22,7 @@ const { writeJobSummary } = require('./utils/summary-generator');
 const { logAnnotation } = require('./utils/logger');
 
 async function main() {
+  const startTime = Date.now();
   console.log('🦞 ARM v1 - GitHub Actions Execution\n');
   
   // Read environment variables
@@ -243,9 +244,21 @@ async function main() {
       executionResults.push(result);
     }
     
-    console.log('\n' + '─'.repeat(80));
-    console.log(`Summary: ✅ Created: ${createdCount} | ♻️  Reused: ${reusedCount} | ⏭️  Skipped: ${skippedCount} | ❌ Failed: ${failedCount}`);
-    console.log('─'.repeat(80));
+    const elapsedTime = ((Date.now() - startTime) / 1000).toFixed(2);
+    
+    console.log('\n' + '='.repeat(80));
+    console.log('                          EXECUTION SUMMARY');
+    console.log('='.repeat(80));
+    console.log(`\n📊 Results:`);
+    console.log(`   ✅ Created:  ${createdCount}`);
+    console.log(`   ♻️  Reused:   ${reusedCount}`);
+    console.log(`   ⏭️  Skipped:  ${skippedCount}`);
+    console.log(`   ❌ Failed:   ${failedCount}`);
+    console.log(`   ━━━━━━━━━━━━━━━━`);
+    console.log(`   📦 Total:    ${results.recommended.length}`);
+    console.log(`\n⏱️  Elapsed time: ${elapsedTime}s`);
+    console.log(`🎯 Success rate: ${Math.round((createdCount + reusedCount) / results.recommended.length * 100)}%`);
+    console.log('\n' + '='.repeat(80));
     
     // Write GitHub Actions job summary
     writeJobSummary(executionResults);
