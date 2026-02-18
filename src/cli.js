@@ -17,6 +17,7 @@
 const fs = require('fs');
 const path = require('path');
 const { DependencyScanner, UpdateFilter, StoryCreator, PRGenerator } = require('./index');
+const { validateConfig, logConfigSummary } = require('./utils/config-validator');
 const { writeJobSummary } = require('./utils/summary-generator');
 
 async function main() {
@@ -55,6 +56,15 @@ async function main() {
     config = JSON.parse(fs.readFileSync(configFullPath, 'utf8'));
   } catch (error) {
     console.error(`❌ Error loading config: ${error.message}`);
+    process.exit(1);
+  }
+  
+  // Validate configuration
+  try {
+    validateConfig(config);
+    logConfigSummary(config);
+  } catch (error) {
+    console.error(`❌ Config validation failed: ${error.message}`);
     process.exit(1);
   }
   
