@@ -4,11 +4,12 @@
  * Automatically creates Story issues in the governance repository
  * when outdated dependencies are detected.
  * 
- * Story: #16
- * Epic: #13
+ * Story: #16, #35
+ * Epic: #13, #30
  */
 
 const { execSync } = require('child_process');
+const { retryWithBackoff } = require('./utils/retry');
 
 /**
  * @typedef {Object} Story
@@ -163,16 +164,18 @@ ${dep.wanted !== dep.latest ? `**Note:** Latest version is ${dep.latest}, but ${
 
     if (dryRun) {
       // Dry-run mode: return mock Story
-      return {
+      const mockStory = {
         number: 0,
         title,
         url: `https://github.com/${this.governanceRepo}/issues/0 (dry-run)`,
         body,
         dependency: dep
       };
+      console.log(`[DRY-RUN] Would create Story: ${mockStory.url}`);
+      return mockStory;
     }
 
-    // Create issue via gh CLI
+    // Create issue via gh CLI with retry logic
     try {
       const labels = [
         'story',
@@ -187,10 +190,13 @@ ${dep.wanted !== dep.latest ? `**Note:** Latest version is ${dep.latest}, but ${
 
       const command = `gh issue create --repo ${this.governanceRepo} --title "${title.replace(/"/g, '\\"')}" --label "${labels}" --body-file "${tempFile}"`;
 
-      const output = execSync(command, {
-        encoding: 'utf8',
-        stdio: 'pipe'
-      }).trim();
+      // Wrap gh CLI call with retry logic
+      const output = await retryWithBackoff(async () => {
+        return execSync(command, {
+          encoding: 'utf8',
+          stdio: 'pipe'
+        }).trim();
+      });
 
       // Clean up temp file
       require('fs').unlinkSync(tempFile);
@@ -199,12 +205,16 @@ ${dep.wanted !== dep.latest ? `**Note:** Latest version is ${dep.latest}, but ${
       const issueUrl = output;
       const issueNumber = parseInt(issueUrl.split('/').pop(), 10);
 
-      return {
+      const story = {
         number: issueNumber,
         title,
         url: issueUrl,
         dependency: dep
       };
+
+      console.log(`✅ Story created: ${issueUrl}`);
+
+      return story;
     } catch (error) {
       throw new Error(`Failed to create Story issue: ${error.message}`);
     }
@@ -217,15 +227,17 @@ ${dep.wanted !== dep.latest ? `**Note:** Latest version is ${dep.latest}, but ${
    */
   async findExistingStory(dep) {
     try {
-      // Search for open Stories matching package name
-      // We'll do more specific matching (version + repo) in the loop
+      // Search for open Stories matching package name with retry logic
       const searchQuery = `repo:${this.governanceRepo} is:issue is:open ${dep.package} in:title`;
       const command = `gh issue list --repo ${this.governanceRepo} --search "${searchQuery}" --json number,title,url,body --limit 10`;
 
-      const output = execSync(command, {
-        encoding: 'utf8',
-        stdio: 'pipe'
-      }).trim();
+      // Wrap gh CLI call with retry logic
+      const output = await retryWithBackoff(async () => {
+        return execSync(command, {
+          encoding: 'utf8',
+          stdio: 'pipe'
+        }).trim();
+      });
 
       if (!output) return null;
 
