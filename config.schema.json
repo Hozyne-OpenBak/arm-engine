@@ -1,0 +1,125 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/Hozyne-OpenBak/openclaw-core/blob/main/arm/config.schema.json",
+  "title": "ARM Configuration Schema",
+  "description": "Configuration schema for ARM v1 — Autonomous Repo Maintenance",
+  "type": "object",
+  "required": ["version", "target", "governance"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "Config schema version",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "examples": ["1.0.0"]
+    },
+    "target": {
+      "type": "object",
+      "description": "Target repository configuration",
+      "required": ["repository"],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "description": "Target repository in owner/name format",
+          "pattern": "^[a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+$",
+          "examples": ["Hozyne-OpenBak/arm"]
+        },
+        "branch": {
+          "type": "string",
+          "description": "Target branch name",
+          "default": "main",
+          "examples": ["main", "master", "develop"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "governance": {
+      "type": "object",
+      "description": "Governance repository configuration",
+      "required": ["repository", "epicNumber"],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "description": "Governance repository in owner/name format",
+          "pattern": "^[a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+$",
+          "examples": ["Hozyne-OpenBak/openclaw-core"]
+        },
+        "epicNumber": {
+          "type": "integer",
+          "description": "Epic issue number to link Stories to",
+          "minimum": 1,
+          "examples": [13]
+        }
+      },
+      "additionalProperties": false
+    },
+    "policy": {
+      "type": "object",
+      "description": "Update policy configuration",
+      "properties": {
+        "allowPatch": {
+          "type": "boolean",
+          "description": "Allow patch version updates (e.g., 1.0.0 → 1.0.1)",
+          "default": true
+        },
+        "allowMinor": {
+          "type": "boolean",
+          "description": "Allow minor version updates (e.g., 1.0.0 → 1.1.0)",
+          "default": true
+        },
+        "allowMajor": {
+          "type": "boolean",
+          "description": "Allow major version updates (e.g., 1.0.0 → 2.0.0)",
+          "default": false
+        },
+        "excludePatterns": {
+          "type": "array",
+          "description": "Package name patterns to exclude (glob syntax)",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "examples": [["@types/*", "eslint-*"]]
+        }
+      },
+      "additionalProperties": false
+    },
+    "execution": {
+      "type": "object",
+      "description": "Execution mode configuration",
+      "properties": {
+        "trigger": {
+          "type": "string",
+          "description": "Trigger mode for ARM execution",
+          "enum": ["manual", "cron"],
+          "default": "manual"
+        },
+        "schedule": {
+          "type": "string",
+          "description": "Cron schedule expression (required if trigger=cron)",
+          "pattern": "^(@(annually|yearly|monthly|weekly|daily|hourly|reboot))|(@every (\\d+(ns|us|µs|ms|s|m|h))+)|((((\\d+,)+\\d+|(\\d+(\\/|-)\\d+)|\\d+|\\*) ?){5,7})$",
+          "examples": ["0 9 * * MON", "0 0 * * *", "@daily"]
+        },
+        "dryRun": {
+          "type": "boolean",
+          "description": "Dry-run mode: scan only, no Story/PR creation",
+          "default": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "github": {
+      "type": "object",
+      "description": "GitHub integration configuration",
+      "properties": {
+        "authMethod": {
+          "type": "string",
+          "description": "Authentication method for GitHub operations",
+          "enum": ["gh-cli"],
+          "default": "gh-cli"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

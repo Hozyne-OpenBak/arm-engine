@@ -1,0 +1,143 @@
+/**
+ * filter.js - Update Policy Filter
+ * 
+ * Filters outdated dependencies based on update policy
+ * (patch/minor/major) and exclusion patterns.
+ * 
+ * Story: #15
+ * Epic: #13
+ */
+
+const { minimatch } = require('minimatch');
+
+/**
+ * @typedef {Object} UpdatePolicy
+ * @property {boolean} allowPatch - Allow patch updates (1.0.0 → 1.0.1)
+ * @property {boolean} allowMinor - Allow minor updates (1.0.0 → 1.1.0)
+ * @property {boolean} allowMajor - Allow major updates (1.0.0 → 2.0.0)
+ * @property {string[]} excludePatterns - Package name patterns to exclude (glob)
+ */
+
+/**
+ * @typedef {Object} FilteredUpdates
+ * @property {import('./scanner').Dependency[]} recommended - Updates to apply
+ * @property {Array<{dep: import('./scanner').Dependency, reason: string}>} excluded - Excluded updates with reasons
+ */
+
+class UpdateFilter {
+  /**
+   * @param {UpdatePolicy} policy - Update policy configuration
+   */
+  constructor(policy) {
+    this.policy = {
+      allowPatch: policy.allowPatch !== undefined ? policy.allowPatch : true,
+      allowMinor: policy.allowMinor !== undefined ? policy.allowMinor : true,
+      allowMajor: policy.allowMajor !== undefined ? policy.allowMajor : false,
+      excludePatterns: policy.excludePatterns || []
+    };
+  }
+
+  /**
+   * Check if package matches any exclusion pattern
+   * @private
+   * @param {string} packageName
+   * @returns {boolean}
+   */
+  isExcluded(packageName) {
+    return this.policy.excludePatterns.some(pattern => 
+      minimatch(packageName, pattern)
+    );
+  }
+
+  /**
+   * Check if change type is allowed by policy
+   * @private
+   * @param {string} type - 'patch' | 'minor' | 'major'
+   * @returns {boolean}
+   */
+  isChangeTypeAllowed(type) {
+    switch (type) {
+      case 'patch':
+        return this.policy.allowPatch;
+      case 'minor':
+        return this.policy.allowMinor;
+      case 'major':
+        return this.policy.allowMajor;
+      default:
+        return false;
+    }
+  }
+
+  /**
+   * Filter dependency report based on policy
+   * @param {import('./scanner').DependencyReport} report
+   * @returns {FilteredUpdates}
+   */
+  filter(report) {
+    const recommended = [];
+    const excluded = [];
+
+    for (const dep of report.dependencies) {
+      // Check exclusion patterns
+      if (this.isExcluded(dep.package)) {
+        excluded.push({
+          dep,
+          reason: `Matches exclusion pattern`
+        });
+        continue;
+      }
+
+      // Check change type policy
+      if (!this.isChangeTypeAllowed(dep.type)) {
+        excluded.push({
+          dep,
+          reason: `${dep.type.charAt(0).toUpperCase() + dep.type.slice(1)} updates not allowed by policy`
+        });
+        continue;
+      }
+
+      // Passed all filters
+      recommended.push(dep);
+    }
+
+    return {
+      recommended,
+      excluded
+    };
+  }
+
+  /**
+   * Get summary of filter results
+   * @param {FilteredUpdates} results
+   * @returns {string}
+   */
+  getSummary(results) {
+    const lines = [];
+    
+    if (results.recommended.length > 0) {
+      lines.push(`Recommended updates: ${results.recommended.length}`);
+      results.recommended.forEach(dep => {
+        const updateStr = dep.wanted === dep.latest 
+          ? `${dep.current} → ${dep.latest}`
+          : `${dep.current} → ${dep.wanted} (latest: ${dep.latest})`;
+        lines.push(`  - ${dep.package}: ${updateStr} (${dep.type})`);
+      });
+    } else {
+      lines.push('No updates recommended.');
+    }
+
+    if (results.excluded.length > 0) {
+      lines.push(`\nExcluded: ${results.excluded.length}`);
+      results.excluded.forEach(({ dep, reason }) => {
+        const updateStr = dep.wanted === dep.latest 
+          ? `${dep.current} → ${dep.latest}`
+          : `${dep.current} → ${dep.wanted} (latest: ${dep.latest})`;
+        lines.push(`  - ${dep.package}: ${updateStr} (${reason})`);
+      });
+    }
+
+    return lines.join('\n');
+  }
+}
+
+module.exports = { UpdateFilter };

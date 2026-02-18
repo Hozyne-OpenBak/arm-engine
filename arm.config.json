@@ -1,0 +1,24 @@
+{
+  "version": "1.0.0",
+  "target": {
+    "repository": "Hozyne-OpenBak/arm",
+    "branch": "main"
+  },
+  "governance": {
+    "repository": "Hozyne-OpenBak/openclaw-core",
+    "epicNumber": 13
+  },
+  "policy": {
+    "allowPatch": true,
+    "allowMinor": true,
+    "allowMajor": false,
+    "excludePatterns": []
+  },
+  "execution": {
+    "trigger": "manual",
+    "dryRun": false
+  },
+  "github": {
+    "authMethod": "gh-cli"
+  }
+}

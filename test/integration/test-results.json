@@ -1,0 +1,49 @@
+{
+  "testId": "test-1771387645840",
+  "timestamp": "2026-02-18T04:07:25.840Z",
+  "steps": [
+    {
+      "step": "scan",
+      "status": "success",
+      "timestamp": "2026-02-18T04:07:26.275Z",
+      "scannedAt": "2026-02-18T04:07:26.275Z",
+      "dependenciesFound": 1
+    },
+    {
+      "step": "filter",
+      "status": "success",
+      "timestamp": "2026-02-18T04:07:26.275Z",
+      "recommended": 1,
+      "excluded": 0
+    },
+    {
+      "step": "story",
+      "status": "created",
+      "timestamp": "2026-02-18T04:07:27.737Z",
+      "storyNumber": 26,
+      "storyUrl": "https://github.com/Hozyne-OpenBak/openclaw-core/issues/26",
+      "title": "Update express (Node.js) from 4.17.1 to 4.22.1"
+    },
+    {
+      "step": "pr",
+      "status": "created",
+      "timestamp": "2026-02-18T04:07:31.627Z",
+      "prNumber": 1,
+      "prUrl": "https://github.com/Hozyne-OpenBak/arm/pull/1",
+      "branch": "arm/update-express-4-22-1",
+      "storyReference": "Hozyne-OpenBak/openclaw-core#26"
+    }
+  ],
+  "urls": {
+    "story": "https://github.com/Hozyne-OpenBak/openclaw-core/issues/26",
+    "pr": "https://github.com/Hozyne-OpenBak/arm/pull/1"
+  },
+  "success": true,
+  "verificationRequired": true,
+  "verificationSteps": [
+    "Review Story: https://github.com/Hozyne-OpenBak/openclaw-core/issues/26",
+    "Review PR: https://github.com/Hozyne-OpenBak/arm/pull/1",
+    "Merge PR: gh pr merge 1 --repo Hozyne-OpenBak/arm --squash",
+    "Verify Story closed: https://github.com/Hozyne-OpenBak/openclaw-core/issues/26"
+  ]
+}

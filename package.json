@@ -1,0 +1,32 @@
+{
+  "name": "arm-v1",
+  "version": "1.0.0",
+  "description": "ARM v1 — Autonomous Repo Maintenance for OpenClaw",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "jest",
+    "test:unit": "jest test/unit",
+    "test:integration": "jest test/integration"
+  },
+  "keywords": [
+    "openclaw",
+    "automation",
+    "maintenance",
+    "dependencies"
+  ],
+  "author": "OpenClaw",
+  "license": "MIT",
+  "dependencies": {
+    "minimatch": "^9.0.3"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "coverageDirectory": "coverage",
+    "collectCoverageFrom": [
+      "src/**/*.js"
+    ]
+  }
+}
