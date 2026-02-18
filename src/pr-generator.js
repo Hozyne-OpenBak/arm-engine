@@ -287,9 +287,9 @@ ${dep.wanted !== dep.latest ? `**Note:** Latest version is ${dep.latest}, but ${
     try {
       const expectedBranch = this.generateBranchName(dep);
       
-      // Search for open PRs matching package and target version
-      // Note: Not including "from ${dep.current}" since current can be "unknown"
-      const searchQuery = `repo:${this.targetRepo} is:pr is:open "${dep.package}" "to ${dep.wanted}" in:title`;
+      // Search for open PRs matching package name
+      // We'll do more specific matching (version + branch) in the loop
+      const searchQuery = `repo:${this.targetRepo} is:pr is:open ${dep.package} in:title`;
       const command = `gh pr list --repo ${this.targetRepo} --search "${searchQuery}" --json number,title,url,headRefName --limit 10`;
 
       const output = execSync(command, {
