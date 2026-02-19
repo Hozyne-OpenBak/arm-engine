@@ -28,6 +28,15 @@ const Navigation: React.FC = () => {
             <Link to="/contact" className="hover:text-blue-200 transition">
               Contact
             </Link>
+            <Link to="/login" className="hover:text-blue-200 transition">
+              Log In
+            </Link>
+            <Link
+              to="/signup"
+              className="bg-white text-blue-600 px-4 py-2 rounded-md font-semibold hover:bg-blue-50 transition"
+            >
+              Sign Up
+            </Link>
           </div>
 
           {/* Mobile Menu Button */}
@@ -87,6 +96,20 @@ const Navigation: React.FC = () => {
               onClick={() => setIsMenuOpen(false)}
             >
               Contact
+            </Link>
+            <Link
+              to="/login"
+              className="block px-3 py-2 rounded-md hover:bg-blue-700 transition"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              Log In
+            </Link>
+            <Link
+              to="/signup"
+              className="block px-3 py-2 rounded-md bg-white text-blue-600 font-semibold hover:bg-blue-50 transition"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              Sign Up
             </Link>
           </div>
         </div>
