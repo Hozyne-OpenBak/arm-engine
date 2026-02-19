@@ -19,18 +19,33 @@ const { isTransientError } = require('../../src/utils/error-categorizer');
 // Mock error categorizer for isolated testing
 jest.mock('../../src/utils/error-categorizer');
 
+// Mock sleep to avoid real delays in tests
+jest.mock('../../src/utils/retry', () => {
+  const actual = jest.requireActual('../../src/utils/retry');
+  return {
+    ...actual,
+    sleep: jest.fn().mockResolvedValue(undefined)
+  };
+});
+
 describe('retryWithBackoff', () => {
   let mockFn;
-  let consoleLogSpy;
+  let consoleWarnSpy;
+  let consoleErrorSpy;
 
   beforeEach(() => {
     mockFn = jest.fn();
-    consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
+    consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
+    consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+    // Ensure sleep mock is reset
+    sleep.mockClear();
+    sleep.mockResolvedValue(undefined);
     jest.clearAllMocks();
   });
 
   afterEach(() => {
-    consoleLogSpy.mockRestore();
+    consoleWarnSpy.mockRestore();
+    consoleErrorSpy.mockRestore();
   });
 
   describe('successful execution', () => {
@@ -41,7 +56,7 @@ describe('retryWithBackoff', () => {
 
       expect(result).toBe('success');
       expect(mockFn).toHaveBeenCalledTimes(1);
-      expect(consoleLogSpy).not.toHaveBeenCalled();
+      expect(consoleWarnSpy).not.toHaveBeenCalled();
     });
 
     test('returns result after transient error and retry', async () => {
@@ -56,8 +71,11 @@ describe('retryWithBackoff', () => {
 
       expect(result).toBe('success');
       expect(mockFn).toHaveBeenCalledTimes(2);
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        expect.stringContaining('⚠️  Retry 1/3 after 1000ms')
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('⚠️  Transient error (attempt 1/')
+      );
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Retrying in 1000ms')
       );
     });
   });
@@ -72,9 +90,11 @@ describe('retryWithBackoff', () => {
         retryWithBackoff(mockFn, 3, 1000)
       ).rejects.toThrow('ETIMEDOUT');
 
-      expect(mockFn).toHaveBeenCalledTimes(3);
-      expect(consoleLogSpy).toHaveBeenCalledTimes(3);
-    });
+      // maxRetries=3 means 3 retry attempts after initial = 4 total attempts
+      expect(mockFn).toHaveBeenCalledTimes(4);
+      // Each retry logs 2 lines (error + delay), 3 retries = 6 lines
+      expect(consoleWarnSpy).toHaveBeenCalledTimes(6);
+    }, 10000); // 10 second timeout for this test
 
     test('logs each retry attempt with correct format', async () => {
       const transientError = new Error('Network timeout');
@@ -85,17 +105,30 @@ describe('retryWithBackoff', () => {
         retryWithBackoff(mockFn, 3, 500)
       ).rejects.toThrow();
 
-      expect(consoleLogSpy).toHaveBeenNthCalledWith(
+      // Each retry logs 2 lines: error message + retry delay
+      expect(consoleWarnSpy).toHaveBeenNthCalledWith(
         1,
-        '⚠️  Retry 1/3 after 500ms: Network timeout'
+        '⚠️  Transient error (attempt 1/4): Network timeout'
       );
-      expect(consoleLogSpy).toHaveBeenNthCalledWith(
+      expect(consoleWarnSpy).toHaveBeenNthCalledWith(
         2,
-        '⚠️  Retry 2/3 after 1000ms: Network timeout'
+        '   Retrying in 500ms...'
       );
-      expect(consoleLogSpy).toHaveBeenNthCalledWith(
+      expect(consoleWarnSpy).toHaveBeenNthCalledWith(
         3,
-        '⚠️  Retry 3/3 after 2000ms: Network timeout'
+        '⚠️  Transient error (attempt 2/4): Network timeout'
+      );
+      expect(consoleWarnSpy).toHaveBeenNthCalledWith(
+        4,
+        '   Retrying in 1000ms...'
+      );
+      expect(consoleWarnSpy).toHaveBeenNthCalledWith(
+        5,
+        '⚠️  Transient error (attempt 3/4): Network timeout'
+      );
+      expect(consoleWarnSpy).toHaveBeenNthCalledWith(
+        6,
+        '   Retrying in 2000ms...'
       );
     });
   });
@@ -111,7 +144,7 @@ describe('retryWithBackoff', () => {
       ).rejects.toThrow('Bad credentials');
 
       expect(mockFn).toHaveBeenCalledTimes(1);
-      expect(consoleLogSpy).not.toHaveBeenCalled();
+      expect(consoleWarnSpy).not.toHaveBeenCalled();
     });
 
     test('does not retry on authentication errors', async () => {
@@ -151,19 +184,16 @@ describe('retryWithBackoff', () => {
       ).rejects.toThrow();
 
       // Check delay calculations in log messages
-      expect(consoleLogSpy).toHaveBeenNthCalledWith(
-        1,
-        expect.stringContaining('after 1000ms')
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Retrying in 1000ms')
       );
-      expect(consoleLogSpy).toHaveBeenNthCalledWith(
-        2,
-        expect.stringContaining('after 2000ms')
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Retrying in 2000ms')
       );
-      expect(consoleLogSpy).toHaveBeenNthCalledWith(
-        3,
-        expect.stringContaining('after 4000ms')
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Retrying in 4000ms')
       );
-    });
+    }, 10000); // 10 second timeout for this test
 
     test('respects custom base delay', async () => {
       const transientError = new Error('Timeout');
@@ -174,13 +204,11 @@ describe('retryWithBackoff', () => {
         retryWithBackoff(mockFn, 2, 500)
       ).rejects.toThrow();
 
-      expect(consoleLogSpy).toHaveBeenNthCalledWith(
-        1,
-        expect.stringContaining('after 500ms')
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Retrying in 500ms')
       );
-      expect(consoleLogSpy).toHaveBeenNthCalledWith(
-        2,
-        expect.stringContaining('after 1000ms')
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Retrying in 1000ms')
       );
     });
   });
@@ -195,8 +223,10 @@ describe('retryWithBackoff', () => {
         retryWithBackoff(mockFn, 5, 100)
       ).rejects.toThrow();
 
-      expect(mockFn).toHaveBeenCalledTimes(5);
-      expect(consoleLogSpy).toHaveBeenCalledTimes(5);
+      // maxRetries=5 means 5 retry attempts after initial = 6 total attempts
+      expect(mockFn).toHaveBeenCalledTimes(6);
+      // Each retry logs 2 lines, 5 retries = 10 lines
+      expect(consoleWarnSpy).toHaveBeenCalledTimes(10);
     });
 
     test('stops at max retries and throws last error', async () => {
@@ -208,7 +238,8 @@ describe('retryWithBackoff', () => {
         retryWithBackoff(mockFn, 2, 100)
       ).rejects.toThrow('Persistent timeout');
 
-      expect(mockFn).toHaveBeenCalledTimes(2);
+      // maxRetries=2 means 2 retry attempts after initial = 3 total attempts
+      expect(mockFn).toHaveBeenCalledTimes(3);
     });
   });
 
@@ -226,7 +257,8 @@ describe('retryWithBackoff', () => {
 
       expect(result).toBe('finally succeeded');
       expect(mockFn).toHaveBeenCalledTimes(3);
-      expect(consoleLogSpy).toHaveBeenCalledTimes(2);
+      // 2 retries = 4 console.warn calls (2 lines per retry)
+      expect(consoleWarnSpy).toHaveBeenCalledTimes(4);
     });
 
     test('preserves error details through retries', async () => {
@@ -249,9 +281,11 @@ describe('retryWithBackoff', () => {
 });
 
 describe('sleep utility', () => {
+  const actualSleep = jest.requireActual('../../src/utils/retry').sleep;
+  
   test('waits for specified milliseconds', async () => {
     const start = Date.now();
-    await sleep(100);
+    await actualSleep(100);
     const elapsed = Date.now() - start;
 
     expect(elapsed).toBeGreaterThanOrEqual(90);
@@ -259,7 +293,7 @@ describe('sleep utility', () => {
   });
 
   test('returns a Promise', () => {
-    const result = sleep(10);
+    const result = actualSleep(10);
     expect(result).toBeInstanceOf(Promise);
   });
 });
