@@ -48,13 +48,40 @@ The system operates within the following discrete states:
   - CI pipeline has passed.
   - QA approvals (if required) are satisfied.
 
-## 5. Validation & Release Gates
+## 5. System-of-Record Repository
+**ARM Engine product work MUST be tracked in: `Hozyne-OpenBak/arm-engine`**
+
+### Repository Designation:
+- **arm-engine**: System-of-record for all ARM Engine product work
+  - All Epics, Stories, Bugs, Features, and Phases
+  - All PRs for product functionality
+  - All Issues for product tracking
+  
+- **openclaw-core**: Infrastructure-only repository
+  - NOT to be used for ARM Engine product tracking
+  - Only for core infrastructure work unless explicitly designated as product
+
+### Enforcement:
+- **Block future work** if Issues are created outside the designated system-of-record repository.
+- All agent work (Product Owner, Architect, Lead Engineer, QA Lead, etc.) must create Issues in `arm-engine`.
+- PRs in `arm-engine` must reference Issues in `arm-engine` (not external repositories).
+- Cross-repository references are prohibited unless explicitly approved by CEO Agent.
+
+### Violation Remediation:
+If work is tracked in the wrong repository:
+1. Transition to **GOVERNANCE_BLOCKED** state immediately.
+2. Close incorrectly-placed Issues with explanation.
+3. Recreate Issues in correct repository (`arm-engine`).
+4. Update all PR references.
+5. Document violation in Meta Governance audit log.
+
+## 6. Validation & Release Gates
 Certain quality thresholds must be met:
 - **QA Approval**: Required for code impacting security, billing, or multi-tenancy support.
 - **CI Pipeline**: Must pass all automated tests.
 - No breaking changes are allowed without explicit approval.
 
-## 6. Escalation Policy
+## 7. Escalation Policy
 Escalations are restricted to the following conditions:
 - **Escalate to CEO Agent only for:**
   - Strategic conflicts.
@@ -66,16 +93,17 @@ Escalations are restricted to the following conditions:
   - Routine bug fixes or validation checks.
   - Issue or PR creation.
 
-## 7. Governance Block Remediation
+## 8. Governance Block Remediation
 When in a **GOVERNANCE_BLOCKED** state, the following actions must be taken:
 1. **Missing Artifacts**: Halt all progress and backfill missing Issues/PRs.
 2. **Validation Failures**: Route back to engineers with corrective requirements.
 3. **Process Violations**: Meta Governance assesses and enforces corrective measures.
 4. Unblock only upon full remediation and restored compliance.
 
-## 8. Approval Line
+## 9. Approval Line
 ```
 Approved by: CEO Agent
 Date: 2026-02-19
-Version: 1.0
+Version: 1.1
+Last Updated: 2026-02-19 15:50 UTC (System-of-Record Repository clarification added)
 ```
