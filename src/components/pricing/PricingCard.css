@@ -1,0 +1,109 @@
+.pricing-card {
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 2rem;
+  background: white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s, box-shadow 0.2s;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.pricing-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.pricing-card-header {
+  text-align: center;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.pricing-card-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0 0 1rem 0;
+  color: #333;
+}
+
+.pricing-card-price {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+}
+
+.price-amount {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #2563eb;
+}
+
+.price-interval {
+  font-size: 1rem;
+  color: #666;
+  margin-left: 0.25rem;
+}
+
+.pricing-card-features {
+  flex: 1;
+  margin-bottom: 1.5rem;
+}
+
+.pricing-card-features ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.pricing-card-features li {
+  padding: 0.75rem 0;
+  display: flex;
+  align-items: flex-start;
+  color: #555;
+}
+
+.feature-checkmark {
+  color: #10b981;
+  font-weight: bold;
+  margin-right: 0.75rem;
+  font-size: 1.2rem;
+}
+
+.pricing-card-action {
+  margin-top: auto;
+}
+
+.btn-select-plan {
+  width: 100%;
+  padding: 0.875rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: white;
+  background-color: #2563eb;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.btn-select-plan:hover:not(:disabled) {
+  background-color: #1d4ed8;
+}
+
+.btn-select-plan:disabled {
+  background-color: #9ca3af;
+  cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+  .pricing-card {
+    padding: 1.5rem;
+  }
+
+  .price-amount {
+    font-size: 2rem;
+  }
+}
